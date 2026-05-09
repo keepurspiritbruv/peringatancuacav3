@@ -39,7 +39,7 @@ PWA (Nelayan) --> POST /report --> Backend (Hono + Redis)
 
 ## Target User
 
-Nelayan tradisional di desa pesisir (Aceh + Bantul, Yogyakarta), usia tua, pendidikan SD-SMP, literasi digital rendah. UI dirancang icon-first, minimal teks, target sentuh minimal 60px, tanpa typing.
+Komunitas nelayan di desa pesisir (Aceh dan Yogyakarta)
 
 ## Fitur Utama
 
