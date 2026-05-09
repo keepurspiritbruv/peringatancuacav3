@@ -1,0 +1,35 @@
+.skills/stitch-ui-design
+.skills/mobile-design
+.skills/ui-ux-design
+.skills/frontend-design
+
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+__pycache__/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test results
+test-results/
+playwright-report/
+
+# Misc
+*.log
+bun.lock
+package-lock.json

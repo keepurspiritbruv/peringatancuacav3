@@ -1,0 +1,9 @@
+[submodule "SHAP-model-api"]
+	path = SHAP-model-api
+	url = https://github.com/itsqal/SHAP-model-api.git
+[submodule "disaster-backend"]
+	path = disaster-backend
+	url = https://github.com/ScaferuZ/disaster-backend.git
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/keepurspiritbruv/peringatancuacav3-frontend.git
