@@ -1,0 +1,102 @@
+services:
+  app:
+    image: ${APP_IMAGE:-docker.io/scaferuzzz/disaster-backend:latest}
+    pull_policy: always
+    container_name: thesis-hub
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      BASE_URL: ${BASE_URL:-}
+      REDIS_URL: ${REDIS_URL:-redis://disaster-redis:6379}
+      ML_BASE_URL: ${ML_BASE_URL:-http://disaster-ml:8000}
+      ALERTS_CHANNEL: ${ALERTS_CHANNEL:-alerts:high}
+      ALERTS_STREAM: ${ALERTS_STREAM:-alerts:stream}
+      ACKS_STREAM: ${ACKS_STREAM:-alerts:acks}
+      REPORT_SYNC_STREAM: ${REPORT_SYNC_STREAM:-reports:sync}
+      REPORT_DEDUPE_PREFIX: ${REPORT_DEDUPE_PREFIX:-reports:dedupe}
+      PUSH_SUBSCRIPTIONS_HASH: ${PUSH_SUBSCRIPTIONS_HASH:-alerts:push:subscriptions}
+      ENABLE_SSE_DELIVERY: ${ENABLE_SSE_DELIVERY:-true}
+      ENABLE_WS_DELIVERY: ${ENABLE_WS_DELIVERY:-true}
+      ENABLE_PUSH_DELIVERY: ${ENABLE_PUSH_DELIVERY:-true}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      JWT_AUTH_ENABLED: ${JWT_AUTH_ENABLED:-false}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_EXPIRES_SECONDS: ${JWT_EXPIRES_SECONDS:-86400}
+      JWT_COOKIE_NAME: ${JWT_COOKIE_NAME:-auth_token}
+      JWT_PUBLIC_PATHS: ${JWT_PUBLIC_PATHS:-}
+      AUTH_USER_KEY_PREFIX: ${AUTH_USER_KEY_PREFIX:-auth:user}
+      AUTH_USER_EMAIL_KEY_PREFIX: ${AUTH_USER_EMAIL_KEY_PREFIX:-auth:user:email}
+      AUTH_USER_IDENTITY_KEY_PREFIX: ${AUTH_USER_IDENTITY_KEY_PREFIX:-auth:user:identity}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
+      OPENCLAW_HOOK_TOKEN: ${OPENCLAW_HOOK_TOKEN:-}
+      OPENCLAW_BROADCAST_GROUPS: ${OPENCLAW_BROADCAST_GROUPS:-}
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@disaster-postgres:5432/disaster_db}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.app.rule=Host(`api.samudraapp.com`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
+    networks:
+      - default
+      - traefik-public
+    depends_on:
+      disaster-redis:
+        condition: service_healthy
+      disaster-postgres:
+        condition: service_healthy
+      disaster-ml:
+        condition: service_started
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  disaster-ml:
+    build: ../../SHAP-model-api
+    container_name: thesis-ml
+    restart: unless-stopped
+    profiles: ["ml"]
+
+  disaster-redis:
+    image: redis:7-alpine
+    container_name: thesis-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  disaster-postgres:
+    image: postgres:16-alpine
+    container_name: thesis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: disaster_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "127.0.0.1:5432:5432"
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  traefik-public:
+    external: true

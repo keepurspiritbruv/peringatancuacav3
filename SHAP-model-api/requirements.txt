@@ -1,0 +1,6 @@
+fastapi
+pydantic
+uvicorn
+pandas
+pytest>=8.0
+httpx>=0.27

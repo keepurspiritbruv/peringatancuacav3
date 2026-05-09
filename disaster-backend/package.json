@@ -1,0 +1,40 @@
+{
+  "name": "disaster-backend",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "push:vapid:generate": "bunx web-push generate-vapid-keys",
+    "stage6:reset": "bun run scripts/stage6/reset-run.ts",
+    "stage6:run": "bun run scripts/stage6/run-iteration.ts",
+    "stage6:load": "bun run scripts/stage6/run-report-load.ts",
+    "stage6:export": "bun run scripts/stage6/export-streams.ts",
+    "stage6:analyze": "bun run scripts/stage6/analyze.ts",
+    "stage6:sample:resources": "bun run scripts/stage6/sample-resources.ts",
+    "analyze:comparison": "bun run scripts/analyze-comparison.ts",
+    "compare:run": "bun run scripts/run-comparison.ts",
+    "analyze:whatsapp": "bun run scripts/analyze-whatsapp-webhooks.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun run scripts/seed-beaches.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/uuid": "^11.0.0",
+    "@types/web-push": "^3.6.4",
+    "drizzle-kit": "^0.31.10"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.11.7",
+    "postgres": "^3.4.9",
+    "redis": "^5.10.0",
+    "uuid": "^13.0.0",
+    "web-push": "^3.6.7"
+  }
+}

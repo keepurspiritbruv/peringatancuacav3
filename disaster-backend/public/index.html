@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <title>Stage 5 Offline Report Harness</title>
+  <style>
+    :root {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      color: #111;
+      background: #f8f8f8;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    form {
+      display: grid;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      max-width: 700px;
+    }
+
+    label {
+      display: grid;
+      gap: 4px;
+      font-size: 0.9rem;
+    }
+
+    input {
+      padding: 8px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 8px 10px;
+      border: 1px solid #222;
+      background: #111;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: #111;
+    }
+
+    #status {
+      font-size: 0.9rem;
+      max-width: 700px;
+    }
+
+    #log {
+      white-space: pre-wrap;
+      margin: 0;
+      background: #0d1117;
+      color: #d7e3f4;
+      padding: 12px;
+      border-radius: 8px;
+      min-height: 220px;
+      max-width: 700px;
+      overflow: auto;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Stage 5 Offline-First Report Harness</h1>
+
+  <div id="status">Network: <strong id="network-state">unknown</strong></div>
+  <div id="auth-status">Auth: <strong id="auth-state">anonymous</strong></div>
+  <form id="auth-form">
+    <label>
+      Nama
+      <input id="auth_nama" value="Budi Nelayan" />
+    </label>
+    <label>
+      No. Identitas Nelayan
+      <input id="auth_no_identitas_nelayan" value="NLYN-001122" />
+    </label>
+    <label>
+      Email
+      <input id="auth_email" type="email" value="budi@example.com" required />
+    </label>
+    <label>
+      Password
+      <input id="auth_password" type="password" value="strongpass123" required />
+    </label>
+    <div class="actions">
+      <button type="button" id="auth-register" class="secondary">Register</button>
+      <button type="button" id="auth-login">Login</button>
+      <button type="button" id="auth-logout" class="secondary">Logout</button>
+    </div>
+  </form>
+
+  <div class="actions">
+    <button type="button" id="push-toggle" class="secondary">Enable Push</button>
+  </div>
+
+  <form id="report-form">
+    <label>
+      lik_codes (comma separated)
+      <input id="lik_codes" value="wn-1,wn-2,wn-3,wn-4" required />
+    </label>
+
+    <label>
+      beach_location
+      <input id="beach_location" value="pantai_lampuuk" required />
+    </label>
+
+    <div class="actions">
+      <button type="submit">Submit Report</button>
+      <button type="button" id="flush-now" class="secondary">Flush Queue Now</button>
+    </div>
+  </form>
+
+  <pre id="log"></pre>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

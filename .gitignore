@@ -11,11 +11,16 @@ node_modules/
 dist/
 __pycache__/
 .pytest_cache/
+*.pyc
+*.egg-info/
 
 # Environment
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+.env.test
 
 # IDE
 .vscode/
@@ -29,7 +34,12 @@ Thumbs.db
 test-results/
 playwright-report/
 
+# External data repos
+disaster-backend/data-cap/
+disaster-backend/data-cuaca/
+
 # Misc
 *.log
 bun.lock
 package-lock.json
+nul
