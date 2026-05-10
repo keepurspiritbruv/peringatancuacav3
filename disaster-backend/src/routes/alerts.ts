@@ -2,6 +2,14 @@ import { Hono } from "hono";
 import { redis } from "../lib/redis";
 import { ALERTS_STREAM } from "../config";
 
+function deriveRiskLevel(decision: Record<string, unknown> | undefined): string {
+	if (!decision) return "unknown";
+	const isActionable = decision.community_characteristics === "Actionable";
+	const isMultisign = decision.is_multisign === true;
+	if (!isActionable) return "safe";
+	return isMultisign ? "unsafe-high" : "unsafe";
+}
+
 const route = new Hono();
 
 route.get("/alerts", async (c) => {
@@ -24,7 +32,11 @@ route.get("/alerts", async (c) => {
 		return {
 			alertId: (parsed.alertId as string) ?? "",
 			beachLocation: (input?.beach_location as string) ?? "",
-			riskLevel: (ml?.community_characteristics as string) ?? (decision?.community_characteristics as string) ?? "Unknown",
+			riskLevel: (parsed.riskLevel as string)
+				?? deriveRiskLevel(decision),
+			reporterCount: (parsed.reporterCount as number) ?? 0,
+			firstReportAt: (parsed.firstReportAt as number) ?? 0,
+			lastReportAt: (parsed.lastReportAt as number) ?? 0,
 			communityCharacteristics: (decision?.community_characteristics as string) ?? "",
 			actionRecommendation: (ml?.action_recommendation as string) ?? "",
 			signDescription: (ml?.sign_description as string) ?? "",

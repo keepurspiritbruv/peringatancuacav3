@@ -3,8 +3,8 @@ import { BEACH_THRESHOLDS, REPORT_THRESHOLD } from "./config";
 
 describe("BEACH_THRESHOLDS", () => {
 	test("Safe beaches have threshold 3", () => {
-		expect(BEACH_THRESHOLDS["pantai_lampuuk"]).toBe(3);
-		expect(BEACH_THRESHOLDS["pantai_ulee_lheue"]).toBe(3);
+		expect(BEACH_THRESHOLDS["pantai_lampuuk"]).toBe(5);
+		expect(BEACH_THRESHOLDS["pantai_ulee_lheue"]).toBe(5);
 	});
 
 	test("Unsafe beaches have threshold 5", () => {

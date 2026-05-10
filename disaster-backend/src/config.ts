@@ -1,6 +1,6 @@
 export const PORT = Number(process.env.PORT ?? 3000);
 export const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
-export const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/disaster_db";
+export const DATABASE_URL = process.env.DATABASE_URL ?? "sqlite://./data/disaster.db";
 export const ML_BASE_URL = process.env.ML_BASE_URL ?? "http://localhost:8000";
 export const BMKG_CACHE_TTL_SECONDS = Number(process.env.BMKG_CACHE_TTL_SECONDS ?? 30 * 60);
 export const BMKG_API_URL = process.env.BMKG_API_URL ?? "https://api.bmkg.go.id/publik/prakiraan-cuaca";
@@ -26,8 +26,8 @@ export const REPORT_WINDOW_MS = Number(process.env.REPORT_WINDOW_MS ?? 10 * 60 *
 export const REPORT_THRESHOLD = Number(process.env.REPORT_THRESHOLD ?? 5);
 
 export const BEACH_THRESHOLDS: Record<string, number> = {
-	pantai_lampuuk: 3,
-	pantai_ulee_lheue: 3,
+	pantai_lampuuk: 5,
+	pantai_ulee_lheue: 5,
 	pantai_depok: 5,
 	pantai_samas: 5,
 	pantai_lhoknga: 5,

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { redis } from "../lib/redis";
 import { sendOpenClawAlert } from "../lib/openclaw";
-import { processReport, getActiveWarning, setActiveWarning } from "../lib/crowdsource";
+import { processReport, getActiveWarning, setActiveWarning, getReportTimeRange } from "../lib/crowdsource";
 import { persistReport, persistShapPrediction } from "../lib/bmkg";
 import { reassure } from "../lib/reassurance";
 import {
@@ -27,7 +27,7 @@ const BEACH_DISPLAY_NAMES: Record<string, string> = {
 };
 
 const DANGER_TYPE_MAP: Record<string, string> = {
-	Wn-1: "Cuaca Ekstrem",
+	"Wn-1": "Cuaca Ekstrem",
 	"Wn-2": "Cuaca Ekstrem",
 	"Wn-3": "Cuaca Ekstrem",
 	"Wn-4": "Gelombang Tinggi",
@@ -47,6 +47,8 @@ function formatWhatsAppAlert(params: {
 	reporterCount: number;
 	triggeredCodes: string[];
 	serverTimestamp: number;
+	firstReportAt: number;
+	lastReportAt: number;
 	activeWarningTtlSeconds: number;
 }): string {
 	const {
@@ -57,6 +59,8 @@ function formatWhatsAppAlert(params: {
 		reporterCount,
 		triggeredCodes,
 		serverTimestamp,
+		firstReportAt,
+		lastReportAt,
 		activeWarningTtlSeconds,
 	} = params;
 
@@ -71,8 +75,7 @@ function formatWhatsAppAlert(params: {
 		year: "numeric",
 	});
 
-	const endTime = new Date(serverTimestamp + activeWarningTtlSeconds * 1000);
-	const endStr = endTime.toLocaleString("id-ID", {
+	const startStr = new Date(firstReportAt).toLocaleString("id-ID", {
 		day: "numeric",
 		month: "long",
 		year: "numeric",
@@ -80,7 +83,7 @@ function formatWhatsAppAlert(params: {
 		minute: "2-digit",
 	});
 
-	const startStr = new Date(serverTimestamp).toLocaleString("id-ID", {
+	const endStr = new Date(lastReportAt).toLocaleString("id-ID", {
 		day: "numeric",
 		month: "long",
 		year: "numeric",
@@ -294,6 +297,9 @@ route.post("/report", async (c) => {
 
 		const result = (await mlRes.json()) as MlResult;
 
+		const isWA = input._channel === "WA";
+		const channel = isWA ? "WHATSAPP" : (input._channel ?? "PWA");
+
 		let reassuranceResult: Record<string, unknown> | null = null;
 		try {
 			const savedReport = await persistReport({
@@ -311,7 +317,13 @@ route.post("/report", async (c) => {
 				actions: result.action_recommendation ? [result.action_recommendation] : [],
 				rawResponse: result as unknown as Record<string, unknown>,
 			});
-			const reassured = await reassure(savedReport.id, result, beachLocation);
+			const reassured = await reassure(savedPrediction.id, savedReport.id, {
+				riskLevel: result.community_characteristics ?? "Unknown",
+				communityCharacteristics: result.community_characteristics,
+				validatedSigns: result.triggered_lik_codes ?? triggeredCodes,
+				actions: result.action_recommendation ? [result.action_recommendation] : [],
+				rawResponse: result as unknown as Record<string, unknown>,
+			}, beachLocation);
 			reassuranceResult = reassured as unknown as Record<string, unknown>;
 		} catch (pgErr) {
 			console.error("[report] PostgreSQL persistence failed (non-blocking):", pgErr);
@@ -321,11 +333,24 @@ route.post("/report", async (c) => {
 		const isActionable = result.community_characteristics === "Actionable";
 		const shouldDistribute = true;
 
+		const riskLevel = isActionable
+			? (isMultisign ? "unsafe-high" : "unsafe")
+			: "safe";
+
+		const reporterCount = Object.values(codeCounts).reduce((sum, c) => sum + c, 0);
+
+		const timeRange = await getReportTimeRange(beachLocation, triggeredCodes);
+
 		const alertEvent = {
 			eventType: "DISASTER_ALERT",
 			alertId: crypto.randomUUID(),
 			reportId,
 			serverTimestamp,
+			beachLocation,
+			riskLevel,
+			reporterCount,
+			firstReportAt: timeRange.firstReportAt,
+			lastReportAt: timeRange.lastReportAt,
 			client: {
 				clientReportId: clientReportId ?? null,
 				createdAtClient: createdAtClient ?? null,
@@ -351,10 +376,6 @@ route.post("/report", async (c) => {
 		await setActiveWarning(beachLocation, mergedCodes, alertEvent.alertId, ACTIVE_WARNING_TTL_SECONDS, alertEvent);
 
 		const alertJson = JSON.stringify(alertEvent);
-
-		// Detect channel and log to experiments:triggers
-		const isWA = input._channel === "WA";
-		const channel = isWA ? "WHATSAPP" : (input._channel ?? "PWA");
 
 		if (input._experimentId && typeof input._experimentId === "string") {
 			await redis.xAdd("experiments:triggers", "*", {
@@ -387,6 +408,8 @@ route.post("/report", async (c) => {
 				reporterCount: Object.values(codeCounts).reduce((sum, c) => sum + c, 0),
 				triggeredCodes,
 				serverTimestamp,
+				firstReportAt: timeRange.firstReportAt,
+				lastReportAt: timeRange.lastReportAt,
 				activeWarningTtlSeconds: ACTIVE_WARNING_TTL_SECONDS,
 			});
 			await sendOpenClawAlert(alertText);

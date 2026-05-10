@@ -58,7 +58,8 @@ describe("GET /alerts", () => {
 		const alert = body.data[0];
 		expect(alert.alertId).toBe("test-alert-1");
 		expect(alert.beachLocation).toBe("pantai_lampuuk");
-		expect(alert.riskLevel).toBe("Low Actionable");
+		expect(alert.riskLevel).toBe("safe");
+		expect(alert.reporterCount).toBe(0);
 		expect(alert.signDescription).toBe("Awan turun");
 		expect(alert.actionRecommendation).toBe("Stay alert");
 		expect(alert.triggeredCodes).toEqual(["wn-1"]);

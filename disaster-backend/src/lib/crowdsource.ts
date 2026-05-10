@@ -51,6 +51,29 @@ export async function processReport(
 /**
  * Clears the queue for each triggered code (per-code reset, not full location reset).
  */
+export async function getReportTimeRange(
+	beachLocation: string,
+	codes: string[],
+): Promise<{ firstReportAt: number; lastReportAt: number }> {
+	let minTs = Infinity;
+	let maxTs = 0;
+	for (const code of codes) {
+		const key = `${QUEUE_PREFIX}:${beachLocation}:${code.toLowerCase()}`;
+		const earliest = await redis.zRangeWithScores(key, 0, 0);
+		const latest = await redis.zRangeWithScores(key, -1, -1);
+		if (earliest.length > 0) {
+			if (earliest[0].score < minTs) minTs = earliest[0].score;
+		}
+		if (latest.length > 0) {
+			if (latest[0].score > maxTs) maxTs = latest[0].score;
+		}
+	}
+	return {
+		firstReportAt: minTs === Infinity ? Date.now() : minTs,
+		lastReportAt: maxTs === 0 ? Date.now() : maxTs,
+	};
+}
+
 export async function resetQueues(beachLocation: string, codes: string[]): Promise<void> {
 	for (const code of codes) {
 		const key = `${QUEUE_PREFIX}:${beachLocation}:${code.toLowerCase()}`;
