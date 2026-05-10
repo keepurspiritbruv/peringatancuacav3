@@ -37,6 +37,10 @@ playwright-report/
 # External data repos
 disaster-backend/data-cap/
 disaster-backend/data-cuaca/
+disaster-backend/data/
+
+# Misc build artifacts
+disaster-backend/index.js
 
 # Misc
 *.log
