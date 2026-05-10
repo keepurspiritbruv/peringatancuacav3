@@ -48,7 +48,7 @@ app.onError((err, c) => {
 });
 
 await initRedis();
-await initDb();
+initDb();
 initWebPush();
 
 await sub.subscribe(ALERTS_CHANNEL, async (message) => {

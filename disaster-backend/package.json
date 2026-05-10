@@ -24,6 +24,7 @@
     "@types/bun": "latest",
     "@types/uuid": "^11.0.0",
     "@types/web-push": "^3.6.4",
+    "better-sqlite3": "^12.9.0",
     "drizzle-kit": "^0.31.10"
   },
   "peerDependencies": {
@@ -32,7 +33,6 @@
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "hono": "^4.11.7",
-    "postgres": "^3.4.9",
     "redis": "^5.10.0",
     "uuid": "^13.0.0",
     "web-push": "^3.6.7"

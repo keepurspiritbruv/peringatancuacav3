@@ -1,5 +1,6 @@
 import { getDb, schema } from "../db";
 import { getBmkgData } from "./bmkg-fetch";
+import { eq, desc } from "drizzle-orm";
 
 export type BmkgWeatherData = {
 	weather: string;
@@ -73,9 +74,9 @@ export async function saveSnapshot(beachId: number, data: {
 	const db = getDb();
 	await db.insert(schema.bmkgSnapshots).values({
 		beachId,
-		weather: data.weather as unknown as Record<string, unknown>,
-		waveForecast: { warning: data.warning },
-		warning: data.warning ? { text: data.warning } : null,
+		weather: JSON.stringify(data.weather),
+		waveForecast: JSON.stringify({ warning: data.warning }),
+		warning: data.warning ? JSON.stringify({ text: data.warning }) : null,
 	});
 }
 
@@ -84,9 +85,9 @@ export async function getLatestSnapshot(beachId: number) {
 	const results = await db
 		.select()
 		.from(schema.bmkgSnapshots)
-		.where(({ beachId: col }) => col.eq(beachId))
+		.where(eq(schema.bmkgSnapshots.beachId, beachId))
 		.limit(1)
-		.orderBy(({ fetchedAt }) => fetchedAt.desc());
+		.orderBy(desc(schema.bmkgSnapshots.fetchedAt));
 
 	return results[0] ?? null;
 }
@@ -96,7 +97,7 @@ export async function getBeachBySlug(slug: string) {
 	const results = await db
 		.select()
 		.from(schema.beaches)
-		.where(({ slug: col }) => col.eq(slug))
+		.where(eq(schema.beaches.slug, slug))
 		.limit(1);
 	return results[0] ?? null;
 }
@@ -122,8 +123,8 @@ export async function persistReport(data: {
 		beachId: beach.id,
 		reporterId: data.reporterId,
 		source: data.source,
-		naturalSigns: data.naturalSigns,
-		rawBody: data.rawBody,
+		naturalSigns: JSON.stringify(data.naturalSigns),
+		rawBody: JSON.stringify(data.rawBody),
 	}).returning();
 	return inserted[0];
 }
@@ -141,9 +142,9 @@ export async function persistShapPrediction(data: {
 		reportId: data.reportId,
 		riskLevel: data.riskLevel,
 		communityCharacteristics: data.communityCharacteristics ?? null,
-		validatedSigns: data.validatedSigns ?? null,
-		actions: data.actions ?? null,
-		rawResponse: data.rawResponse ?? null,
+		validatedSigns: data.validatedSigns ? JSON.stringify(data.validatedSigns) : null,
+		actions: data.actions ? JSON.stringify(data.actions) : null,
+		rawResponse: data.rawResponse ? JSON.stringify(data.rawResponse) : null,
 	}).returning();
 	return inserted[0];
 }

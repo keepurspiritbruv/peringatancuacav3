@@ -42,6 +42,7 @@ async function getBeachId(beachSlug: string): Promise<number | null> {
 
 export async function reassure(
 	predictionId: number,
+	reportId: string,
 	shapResult: ShapResult,
 	beachSlug: string,
 ): Promise<ReassuranceResult> {
@@ -104,11 +105,12 @@ export async function reassure(
 
 	await db.insert(schema.reassuranceResults).values({
 		predictionId,
+		reportId,
 		shapRisk: result.shapRisk,
 		bmkgRisk: result.bmkgRisk,
 		agreed: result.agreed,
 		finalLevel: result.finalLevel,
-		details: result.details,
+		details: JSON.stringify(result.details),
 	});
 
 	return result;

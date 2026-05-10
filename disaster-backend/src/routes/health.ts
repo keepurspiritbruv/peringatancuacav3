@@ -51,4 +51,12 @@ route.get("/health", async (c) => {
 		});
 	});
 
+route.post("/test/reset", async (c) => {
+	if (process.env.NODE_ENV === "production") {
+		return c.json({ ok: false, error: "not available in production" }, 403);
+	}
+	await redis.flushAll();
+	return c.json({ ok: true, message: "Redis flushed" });
+});
+
 export default route;
