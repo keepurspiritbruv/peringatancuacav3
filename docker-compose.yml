@@ -1,10 +1,8 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: thesis-redis
+    container_name: peringatan-redis
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
@@ -18,7 +16,7 @@ services:
     build:
       context: ./SHAP-model-api
       dockerfile: Dockerfile
-    container_name: thesis-ml
+    container_name: peringatan-ml
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -30,16 +28,14 @@ services:
     build:
       context: ./disaster-backend
       dockerfile: Dockerfile
-    container_name: thesis-backend
+    container_name: peringatan-backend
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:3000"
     environment:
       PORT: "3000"
       REDIS_URL: redis://redis:6379
       ML_BASE_URL: http://ml:8000
       DATABASE_URL: sqlite:///app/data/disaster.db
-      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      BASE_URL: ${BASE_URL:-https://api.samudraapp.id}
       JWT_AUTH_ENABLED: ${JWT_AUTH_ENABLED:-false}
       JWT_SECRET: ${JWT_SECRET:-}
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
@@ -55,22 +51,44 @@ services:
         condition: service_healthy
       ml:
         condition: service_healthy
+    networks:
+      - default
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.peringatan-backend.rule=Host(`api.samudraapp.id`)"
+      - "traefik.http.routers.peringatan-backend.entrypoints=websecure"
+      - "traefik.http.routers.peringatan-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.peringatan-backend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik-public"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        BACKEND_URL: http://backend:3000
-    container_name: thesis-frontend
+        BACKEND_URL: https://api.samudraapp.id
+    container_name: peringatan-frontend
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3001"
     environment:
-      BACKEND_URL: http://backend:3000
+      BACKEND_URL: https://api.samudraapp.id
     depends_on:
       - backend
+    networks:
+      - default
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.peringatan-frontend.rule=Host(`samudraapp.id`) || Host(`www.samudraapp.id`)"
+      - "traefik.http.routers.peringatan-frontend.entrypoints=websecure"
+      - "traefik.http.routers.peringatan-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.peringatan-frontend.loadbalancer.server.port=3001"
+      - "traefik.docker.network=traefik-public"
 
 volumes:
   redis_data:
   backend_data:
+
+networks:
+  traefik-public:
+    external: true
