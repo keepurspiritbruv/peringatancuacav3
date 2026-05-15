@@ -41,6 +41,7 @@ services:
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
       OPENCLAW_HOOK_TOKEN: ${OPENCLAW_HOOK_TOKEN:-}
       OPENCLAW_BROADCAST_GROUPS: ${OPENCLAW_BROADCAST_GROUPS:-}
+      WEATHERAPI_KEY: ${WEATHERAPI_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
@@ -53,6 +54,7 @@ services:
         condition: service_healthy
     networks:
       - default
+      - shared-net
       - traefik-public
     labels:
       - "traefik.enable=true"
@@ -85,10 +87,27 @@ services:
       - "traefik.http.services.peringatan-frontend.loadbalancer.server.port=3001"
       - "traefik.docker.network=traefik-public"
 
+  openclaw-bridge:
+    build:
+      context: ./openclaw-bridge
+      dockerfile: Dockerfile
+    container_name: peringatan-openclaw-bridge
+    restart: unless-stopped
+    environment:
+      GATEWAY_WS_URL: ws://openclaw-openclaw-gateway-1:18789
+      GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      BACKEND_WEBHOOK_URL: http://peringatan-backend:3000/api/openclaw/webhook
+    depends_on:
+      - backend
+    networks:
+      - default
+
 volumes:
   redis_data:
   backend_data:
 
 networks:
+  shared-net:
+    external: true
   traefik-public:
     external: true

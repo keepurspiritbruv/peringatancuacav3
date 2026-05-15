@@ -26,6 +26,8 @@ import openclawWebhookRoute from "./routes/openclaw-webhook";
 import reportsActiveRoute from "./routes/reports-active";
 import bmkgRoute from "./routes/bmkg";
 import alertsRoute from "./routes/alerts";
+import reportSubmitRoute from "./routes/report-submit";
+import broadcastMorningRoute from "./routes/broadcast-morning";
 
 const app = new Hono();
 app.use("/api/*", cors());
@@ -97,6 +99,8 @@ app.route("/api", openclawWebhookRoute);
 app.route("/api", reportsActiveRoute);
 app.route("/api", bmkgRoute);
 app.route("/api", alertsRoute);
+app.route("/api", reportSubmitRoute);
+app.route("/api", broadcastMorningRoute);
 app.route("/", webRoute);
 
 export default {

@@ -62,6 +62,11 @@ export const JWT_PUBLIC_PATHS = parseCsvEnv(process.env.JWT_PUBLIC_PATHS, [
 	"/api/push/vapid-public-key",
 	"/api/auth/register",
 	"/api/auth/login",
+	"/api/report/submit",
+	"/api/broadcast/morning",
+	"/api/alerts",
+	"/api/reports/active",
+	"/api/bmkg",
 ]);
 export const AUTH_USER_KEY_PREFIX = process.env.AUTH_USER_KEY_PREFIX ?? "auth:user";
 export const AUTH_USER_EMAIL_KEY_PREFIX =
@@ -72,6 +77,7 @@ export const AUTH_USER_IDENTITY_KEY_PREFIX =
 export const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL ?? "";
 export const OPENCLAW_HOOK_TOKEN = process.env.OPENCLAW_HOOK_TOKEN ?? "";
 export const OPENCLAW_BROADCAST_GROUPS = parseCsvEnv(process.env.OPENCLAW_BROADCAST_GROUPS, []);
+export const WEATHERAPI_KEY = process.env.WEATHERAPI_KEY ?? "";
 
 if (JWT_AUTH_ENABLED && !JWT_SECRET) {
 	throw new Error("JWT_AUTH_ENABLED=true requires JWT_SECRET to be set");

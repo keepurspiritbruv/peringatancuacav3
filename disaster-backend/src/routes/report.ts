@@ -18,7 +18,7 @@ import {
 import { ALLOWED_BEACH_LOCATIONS } from "../types";
 import type { MlResult, PredictionInput } from "../types";
 
-const BEACH_DISPLAY_NAMES: Record<string, string> = {
+export const BEACH_DISPLAY_NAMES: Record<string, string> = {
 	pantai_lampuuk: "Pantai Lampuuk",
 	pantai_lhoknga: "Pantai Lhoknga",
 	pantai_ulee_lheue: "Pantai Ulee Lheue",
