@@ -164,3 +164,186 @@ class InferenceEngine:
             "action_recommendation": action_recommendation,
             "triggered_lik_codes": combined_codes,
         }
+
+    ESCALATION_WEIGHTS = {
+        0: 0.3,
+        1: 0.6,
+        2: 0.9,
+    }
+
+    COMMUNITY_FACTOR_META = {
+        "interaction": {
+            "label_id": "Interaksi Bencana",
+            "label_en": "Disaster Interaction",
+            "rule_key": "Level of Interaction with Disaster Status",
+            "detail_safe_id": "Cukup berinteraksi dengan bencana",
+            "detail_safe_en": "Adequate disaster interaction",
+            "detail_unsafe_id": "Kurang berinteraksi dengan bencana",
+            "detail_unsafe_en": "Limited disaster interaction",
+        },
+        "frequency": {
+            "label_id": "Frekuensi Pelaporan",
+            "label_en": "Reporting Frequency",
+            "rule_key": "Frequency of Usage Status",
+            "detail_safe_id": "Sering menggunakan sistem",
+            "detail_safe_en": "Frequently uses the system",
+            "detail_unsafe_id": "Jarang menggunakan sistem",
+            "detail_unsafe_en": "Rarely uses the system",
+        },
+        "duration": {
+            "label_id": "Durasi Penggunaan",
+            "label_en": "Usage Duration",
+            "rule_key": "Usage Duration Status",
+            "detail_safe_id": "Lama menggunakan sistem",
+            "detail_safe_en": "Long usage duration",
+            "detail_unsafe_id": "Durasi penggunaan singkat",
+            "detail_unsafe_en": "Short usage duration",
+        },
+        "lik_combination": {
+            "label_id": "Kombinasi LIK",
+            "label_en": "LIK Combination",
+            "rule_key": "Number of Known LIK Status",
+            "detail_safe_id": "Cukup mengenal tanda alam",
+            "detail_safe_en": "Adequate knowledge of natural signs",
+            "detail_unsafe_id": "Kurang mengenal tanda alam",
+            "detail_unsafe_en": "Limited knowledge of natural signs",
+        },
+        "experience": {
+            "label_id": "Pengalaman Bencana",
+            "label_en": "Disaster Experience",
+            "rule_key": "Number of Experience with Disaster Status",
+            "detail_safe_id": "Pengalaman bencana memadai",
+            "detail_safe_en": "Adequate disaster experience",
+            "detail_unsafe_id": "Pengalaman bencana terbatas",
+            "detail_unsafe_en": "Limited disaster experience",
+        },
+    }
+
+    def compute_contributions(self, prediction: dict, rules: dict) -> dict:
+        import pandas as pd
+        from pathlib import Path
+
+        contributions = []
+
+        triggered_codes = prediction.get("triggered_lik_codes", [])
+        csv_path = Path(__file__).parent / 'lik_filtered_action_taken.csv'
+        df_action = pd.read_csv(csv_path)
+        escalation_map = {
+            'berhati-hati / tingkatkan kewaspadaan': 0,
+            'siaga penuh / amankan alat tangkap': 1,
+            'sesuaikan jadwal melaut': 2,
+        }
+
+        for code in triggered_codes:
+            sign_info = self.get_lik_sign_info([code.lower()])
+            if not sign_info:
+                continue
+            info = sign_info[0]
+            row = df_action[df_action['LIK'] == code]
+            if row.empty:
+                continue
+            action_str = row.iloc[0]['most_action_taken'].lower()
+            level = escalation_map.get(action_str, 0)
+            raw_weight = self.ESCALATION_WEIGHTS.get(level, 0.3)
+            contributions.append({
+                "factor": code,
+                "label_id": info["label_id"],
+                "label_en": info["label_en"],
+                "category": "natural_sign",
+                "weight": raw_weight,
+                "direction": "increases_risk",
+                "detail_id": info["detail_id"],
+                "detail_en": info["detail_en"],
+            })
+
+        community_profile_factors = []
+        beach_slug = None
+        for row in self.df_community.itertuples():
+            if self._beach_matches_rules(row, rules):
+                beach_name = getattr(row, 'Mapped Beach', None)
+                beach_slug = beach_name.replace(" ", "_") if beach_name else None
+                break
+
+        for key, meta in self.COMMUNITY_FACTOR_META.items():
+            status = rules.get(meta["rule_key"], "Safe")
+            is_unsafe = status == "Unsafe"
+            raw_weight = 0.5 if is_unsafe else 0.0
+            value = self._get_community_value(beach_slug, key) if beach_slug else 0
+
+            contributions.append({
+                "factor": key,
+                "label_id": meta["label_id"],
+                "label_en": meta["label_en"],
+                "category": "community",
+                "weight": raw_weight,
+                "direction": "increases_risk" if is_unsafe else "neutral",
+                "detail_id": meta["detail_unsafe_id"] if is_unsafe else meta["detail_safe_id"],
+                "detail_en": meta["detail_unsafe_en"] if is_unsafe else meta["detail_safe_en"],
+            })
+
+            community_profile_factors.append({
+                "key": key,
+                "label_id": meta["label_id"],
+                "label_en": meta["label_en"],
+                "value": value,
+                "status": status,
+                "detail_id": meta["detail_unsafe_id"] if is_unsafe else meta["detail_safe_id"],
+                "detail_en": meta["detail_unsafe_en"] if is_unsafe else meta["detail_safe_en"],
+            })
+
+        total = sum(c["weight"] for c in contributions)
+        if total > 0:
+            for c in contributions:
+                c["weight"] = round(c["weight"] / total, 2)
+
+        contributions.sort(key=lambda x: x["weight"], reverse=True)
+
+        summary_parts_id = []
+        summary_parts_en = []
+        for c in contributions[:5]:
+            if c["weight"] > 0:
+                summary_parts_id.append(f"{c['label_id'].lower()} ({int(c['weight'] * 100)}%)")
+                summary_parts_en.append(f"{c['label_en'].lower()} ({int(c['weight'] * 100)}%)")
+
+        summary_id = f"Bahaya karena {', '.join(summary_parts_id)}" if summary_parts_id else "Tidak ada faktor risiko terdeteksi."
+        summary_en = f"Danger due to {', '.join(summary_parts_en)}" if summary_parts_en else "No risk factors detected."
+
+        overall = rules.get("Overall Category", "Safe")
+
+        return {
+            "summary_id": summary_id,
+            "summary_en": summary_en,
+            "contributions": contributions,
+            "community_profile": {
+                "beach": beach_slug.replace(" ", "_") if beach_slug else "unknown",
+                "overall": overall,
+                "factors": community_profile_factors,
+            },
+        }
+
+    def _beach_matches_rules(self, csv_row, rules: dict) -> bool:
+        row_category = getattr(csv_row, 'Overall Category', None)
+        rules_category = rules.get('Overall Category', None)
+        if row_category and rules_category and row_category == rules_category:
+            row_interaction = getattr(csv_row, 'Level of Interaction with Disaster Status', None)
+            rules_interaction = rules.get('Level of Interaction with Disaster Status', None)
+            if row_interaction and rules_interaction and row_interaction == rules_interaction:
+                return True
+        return False
+
+    def _get_community_value(self, beach_slug: str, factor_key: str) -> float:
+        csv_col_map = {
+            "interaction": "Level of Interaction with Disaster",
+            "frequency": "Frequency of Usage (max) (in month)",
+            "duration": "Usage Duration",
+            "lik_combination": "Number of LIK Combination",
+            "experience": "Number of Experience with Disaster",
+        }
+        col_name = csv_col_map.get(factor_key)
+        if not col_name:
+            return 0.0
+        beach_name = beach_slug.replace("_", " ")
+        row = self.df_community[self.df_community['Mapped Beach'] == beach_name]
+        if row.empty:
+            return 0.0
+        return float(row.iloc[0][col_name]) if col_name in row.columns else 0.0

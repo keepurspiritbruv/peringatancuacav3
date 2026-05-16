@@ -134,3 +134,71 @@ class TestSignDescriptions:
         assert len(descs) == 2
         codes = {d["code"] for d in descs}
         assert codes == {"WN-1", "WN-3"}
+
+
+class TestComputeContributions:
+
+    def test_contributions_with_unsafe_beach(self, engine):
+        data = {
+            "lik_codes": ["wn-4", "wn-7"],
+            "active_warning": [],
+            "rules": engine.pantai_samas_rules,
+        }
+        prediction = engine.predict(data)
+        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules)
+        assert "contributions" in contributions
+        assert "community_profile" in contributions
+        assert "summary_id" in contributions
+        assert "summary_en" in contributions
+        assert len(contributions["contributions"]) > 0
+        total_weight = sum(c["weight"] for c in contributions["contributions"])
+        assert abs(total_weight - 1.0) < 0.01
+
+    def test_contributions_with_safe_beach(self, engine):
+        data = {
+            "lik_codes": ["wn-2"],
+            "active_warning": [],
+            "rules": engine.pantai_lampuuk_rules,
+        }
+        prediction = engine.predict(data)
+        contributions = engine.compute_contributions(prediction, engine.pantai_lampuuk_rules)
+        assert len(contributions["contributions"]) > 0
+        community_factors = [c for c in contributions["contributions"] if c["category"] == "community"]
+        safe_factors = [c for c in community_factors if c["direction"] == "neutral"]
+        assert len(safe_factors) == 4
+
+    def test_contributions_no_lik_codes(self, engine):
+        data = {
+            "lik_codes": [],
+            "active_warning": [],
+            "rules": engine.pantai_samas_rules,
+        }
+        prediction = engine.predict(data)
+        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules)
+        natural_signs = [c for c in contributions["contributions"] if c["category"] == "natural_sign"]
+        assert len(natural_signs) == 0
+
+    def test_contributions_sorted_by_weight_desc(self, engine):
+        data = {
+            "lik_codes": ["wn-4", "wn-7"],
+            "active_warning": [],
+            "rules": engine.pantai_samas_rules,
+        }
+        prediction = engine.predict(data)
+        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules)
+        weights = [c["weight"] for c in contributions["contributions"]]
+        assert weights == sorted(weights, reverse=True)
+
+    def test_community_profile_has_all_five_factors(self, engine):
+        data = {
+            "lik_codes": ["wn-3"],
+            "active_warning": [],
+            "rules": engine.pantai_depok_rules,
+        }
+        prediction = engine.predict(data)
+        contributions = engine.compute_contributions(prediction, engine.pantai_depok_rules)
+        profile = contributions["community_profile"]
+        assert profile["overall"] == "Unsafe"
+        assert len(profile["factors"]) == 5
+        factor_keys = [f["key"] for f in profile["factors"]]
+        assert set(factor_keys) == {"interaction", "frequency", "duration", "lik_combination", "experience"}
