@@ -113,3 +113,61 @@ def test_model_info(client):
     assert body["type"] == "rule-based"
     assert body["supported_beaches"] == SUPPORTED_BEACHES
     assert body["trusted_signs"] == TRUSTED_SIGNS
+
+
+def test_predict_response_has_explanation(client):
+    payload = {
+        "beach_location": "pantai_samas",
+        "lik_codes": ["wn-4", "wn-7"],
+        "is_active_warning": False,
+        "active_warning": [],
+    }
+    res = client.post("/predict", json=payload)
+    assert res.status_code == 200
+    body = res.json()
+    assert "explanation" in body
+    assert "summary_id" in body["explanation"]
+    assert "summary_en" in body["explanation"]
+    assert "contributions" in body["explanation"]
+    assert "community_profile" in body["explanation"]
+    assert len(body["explanation"]["contributions"]) > 0
+    assert len(body["explanation"]["community_profile"]["factors"]) == 5
+
+
+def test_predict_response_existing_fields_unchanged(client):
+    res = client.post("/predict", json=VALID_PAYLOAD)
+    body = res.json()
+    assert "active_warning" in body
+    assert "sign_description" in body
+    assert "community_characteristics" in body
+    assert "action_recommendation" in body
+    assert "triggered_lik_codes" in body
+
+
+def test_predict_explanation_empty_lik_codes(client):
+    payload = {
+        "beach_location": "pantai_lampuuk",
+        "lik_codes": [],
+        "is_active_warning": False,
+        "active_warning": [],
+    }
+    res = client.post("/predict", json=payload)
+    assert res.status_code == 200
+    body = res.json()
+    contributions = body["explanation"]["contributions"]
+    lik_contributions = [c for c in contributions if c["category"] == "natural_sign"]
+    assert len(lik_contributions) == 0
+    assert "durasi penggunaan" in body["explanation"]["summary_id"].lower()
+
+
+def test_predict_explanation_contributions_normalized(client):
+    payload = {
+        "beach_location": "pantai_samas",
+        "lik_codes": ["wn-4"],
+        "is_active_warning": False,
+        "active_warning": [],
+    }
+    res = client.post("/predict", json=payload)
+    body = res.json()
+    total = sum(c["weight"] for c in body["explanation"]["contributions"])
+    assert abs(total - 1.0) < 0.02
