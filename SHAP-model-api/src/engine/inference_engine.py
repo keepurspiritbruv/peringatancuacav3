@@ -219,7 +219,7 @@ class InferenceEngine:
         },
     }
 
-    def compute_contributions(self, prediction: dict, rules: dict) -> dict:
+    def compute_contributions(self, prediction: dict, rules: dict, beach_location: str = "") -> dict:
         import pandas as pd
         from pathlib import Path
 
@@ -257,18 +257,14 @@ class InferenceEngine:
             })
 
         community_profile_factors = []
-        beach_slug = None
-        for row in self.df_community.itertuples():
-            if self._beach_matches_rules(row, rules):
-                beach_name = getattr(row, 'Mapped Beach', None)
-                beach_slug = beach_name.replace(" ", "_") if beach_name else None
-                break
+        beach_slug = beach_location.replace("_", " ") if beach_location else None
+        csv_row = self.df_community[self.df_community['Mapped Beach'] == beach_slug] if beach_slug else None
 
         for key, meta in self.COMMUNITY_FACTOR_META.items():
             status = rules.get(meta["rule_key"], "Safe")
             is_unsafe = status == "Unsafe"
             raw_weight = 0.5 if is_unsafe else 0.0
-            value = self._get_community_value(beach_slug, key) if beach_slug else 0
+            value = self._get_community_value_from_row(csv_row, key) if csv_row is not None and not csv_row.empty else 0.0
 
             contributions.append({
                 "factor": key,
@@ -315,23 +311,13 @@ class InferenceEngine:
             "summary_en": summary_en,
             "contributions": contributions,
             "community_profile": {
-                "beach": beach_slug.replace(" ", "_") if beach_slug else "unknown",
+                "beach": beach_location if beach_location else "unknown",
                 "overall": overall,
                 "factors": community_profile_factors,
             },
         }
 
-    def _beach_matches_rules(self, csv_row, rules: dict) -> bool:
-        row_category = getattr(csv_row, 'Overall Category', None)
-        rules_category = rules.get('Overall Category', None)
-        if row_category and rules_category and row_category == rules_category:
-            row_interaction = getattr(csv_row, 'Level of Interaction with Disaster Status', None)
-            rules_interaction = rules.get('Level of Interaction with Disaster Status', None)
-            if row_interaction and rules_interaction and row_interaction == rules_interaction:
-                return True
-        return False
-
-    def _get_community_value(self, beach_slug: str, factor_key: str) -> float:
+    def _get_community_value_from_row(self, csv_row, factor_key: str) -> float:
         csv_col_map = {
             "interaction": "Level of Interaction with Disaster",
             "frequency": "Frequency of Usage (max) (in month)",
@@ -342,8 +328,6 @@ class InferenceEngine:
         col_name = csv_col_map.get(factor_key)
         if not col_name:
             return 0.0
-        beach_name = beach_slug.replace("_", " ")
-        row = self.df_community[self.df_community['Mapped Beach'] == beach_name]
-        if row.empty:
+        if csv_row is None or csv_row.empty:
             return 0.0
-        return float(row.iloc[0][col_name]) if col_name in row.columns else 0.0
+        return float(csv_row.iloc[0][col_name]) if col_name in csv_row.columns else 0.0

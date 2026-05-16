@@ -145,12 +145,13 @@ class TestComputeContributions:
             "rules": engine.pantai_samas_rules,
         }
         prediction = engine.predict(data)
-        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules)
+        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules, "pantai_samas")
         assert "contributions" in contributions
         assert "community_profile" in contributions
         assert "summary_id" in contributions
         assert "summary_en" in contributions
         assert len(contributions["contributions"]) > 0
+        assert contributions["community_profile"]["beach"] == "pantai_samas"
         total_weight = sum(c["weight"] for c in contributions["contributions"])
         assert abs(total_weight - 1.0) < 0.01
 
@@ -161,7 +162,7 @@ class TestComputeContributions:
             "rules": engine.pantai_lampuuk_rules,
         }
         prediction = engine.predict(data)
-        contributions = engine.compute_contributions(prediction, engine.pantai_lampuuk_rules)
+        contributions = engine.compute_contributions(prediction, engine.pantai_lampuuk_rules, "pantai_lampuuk")
         assert len(contributions["contributions"]) > 0
         community_factors = [c for c in contributions["contributions"] if c["category"] == "community"]
         safe_factors = [c for c in community_factors if c["direction"] == "neutral"]
@@ -174,7 +175,7 @@ class TestComputeContributions:
             "rules": engine.pantai_samas_rules,
         }
         prediction = engine.predict(data)
-        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules)
+        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules, "pantai_samas")
         natural_signs = [c for c in contributions["contributions"] if c["category"] == "natural_sign"]
         assert len(natural_signs) == 0
 
@@ -185,7 +186,7 @@ class TestComputeContributions:
             "rules": engine.pantai_samas_rules,
         }
         prediction = engine.predict(data)
-        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules)
+        contributions = engine.compute_contributions(prediction, engine.pantai_samas_rules, "pantai_samas")
         weights = [c["weight"] for c in contributions["contributions"]]
         assert weights == sorted(weights, reverse=True)
 
@@ -196,7 +197,7 @@ class TestComputeContributions:
             "rules": engine.pantai_depok_rules,
         }
         prediction = engine.predict(data)
-        contributions = engine.compute_contributions(prediction, engine.pantai_depok_rules)
+        contributions = engine.compute_contributions(prediction, engine.pantai_depok_rules, "pantai_depok")
         profile = contributions["community_profile"]
         assert profile["overall"] == "Unsafe"
         assert len(profile["factors"]) == 5

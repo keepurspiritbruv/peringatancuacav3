@@ -74,7 +74,7 @@ def predict_risk(input_data: PredictionInput):
     
     try:
         result = engine.predict(data_for_engine)
-        explanation = engine.compute_contributions(result, community_rules["rules"])
+        explanation = engine.compute_contributions(result, community_rules["rules"], beach_key)
         result["explanation"] = explanation
         return result
     except Exception as e:
