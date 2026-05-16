@@ -41,12 +41,55 @@ route.get("/alerts", async (c) => {
 			actionRecommendation: (ml?.action_recommendation as string) ?? "",
 			signDescription: (ml?.sign_description as string) ?? "",
 			triggeredCodes: ((ml?.triggered_lik_codes as string[]) ?? (input?.lik_codes as string[]) ?? []),
+			explanation: ml?.explanation as Record<string, unknown> | undefined,
 			serverTimestamp: (parsed.serverTimestamp as number) ?? 0,
 		};
 	});
 
 	const sorted = alerts.reverse().slice(0, limit);
 	return c.json({ ok: true, data: sorted });
+});
+
+route.get("/alerts/:id/explanation", async (c) => {
+	const alertId = c.req.param("id");
+	const events = await redis.xRange(ALERTS_STREAM, "-", "+", { COUNT: 1000 });
+
+	if (!events || events.length === 0) {
+		return c.json({ ok: false, error: "Alert not found" }, 404);
+	}
+
+	const target = (events as unknown as { id: string; message: Record<string, string> }[]).find((event) => {
+		const parsed = JSON.parse(event.message.json ?? "{}") as Record<string, unknown>;
+		return parsed.alertId === alertId;
+	});
+
+	if (!target) {
+		return c.json({ ok: false, error: "Alert not found" }, 404);
+	}
+
+	const parsed = JSON.parse(target.message.json ?? "{}") as Record<string, unknown>;
+	const ml = parsed.ml as Record<string, unknown> | undefined;
+	const decision = parsed.decision as Record<string, unknown> | undefined;
+	const input = parsed.input as Record<string, unknown> | undefined;
+	const reassurance = parsed.reassurance as Record<string, unknown> | undefined;
+	const explanation = ml?.explanation as Record<string, unknown> | undefined;
+
+	return c.json({
+		ok: true,
+		data: {
+			alertId: (parsed.alertId as string) ?? "",
+			riskLevel: (parsed.riskLevel as string) ?? deriveRiskLevel(decision),
+			beachLocation: (input?.beach_location as string) ?? "",
+			summary_id: (explanation?.summary_id as string) ?? "",
+			summary_en: (explanation?.summary_en as string) ?? "",
+			contributions: (explanation?.contributions as unknown[]) ?? [],
+			communityProfile: (explanation?.community_profile as unknown) ?? null,
+			reassurance: reassurance ?? null,
+			createdAt: (parsed.serverTimestamp as number)
+				? new Date(parsed.serverTimestamp as number).toISOString()
+				: null,
+		},
+	});
 });
 
 export default route;
