@@ -116,18 +116,21 @@ class TestBeachCommunityCharacteristics:
 
 class TestSignDescriptions:
 
-    def test_valid_code_returns_description(self, engine):
-        descs = engine.get_lik_sign_description(["wn-1"])
+    def test_valid_code_returns_info(self, engine):
+        descs = engine.get_lik_sign_info(["wn-1"])
         assert len(descs) == 1
-        assert descs[0]["code"] == "Wn-1"
-        assert "Awan tampak turun" in descs[0]["description"]
+        assert descs[0]["code"] == "WN-1"
+        assert "Awan tampak turun" in descs[0]["detail_id"]
+        assert descs[0]["label_id"] == "Awan Turun"
+        assert descs[0]["label_en"] == "Falling Clouds"
+        assert descs[0]["detail_en"] == "Clouds appear to descend forming clusters 3 times"
 
     def test_invalid_code_returns_empty(self, engine):
-        descs = engine.get_lik_sign_description(["wn-99"])
+        descs = engine.get_lik_sign_info(["wn-99"])
         assert descs == []
 
     def test_mixed_valid_invalid(self, engine):
-        descs = engine.get_lik_sign_description(["wn-1", "wn-99", "wn-3"])
+        descs = engine.get_lik_sign_info(["wn-1", "wn-99", "wn-3"])
         assert len(descs) == 2
         codes = {d["code"] for d in descs}
-        assert codes == {"Wn-1", "Wn-3"}
+        assert codes == {"WN-1", "WN-3"}

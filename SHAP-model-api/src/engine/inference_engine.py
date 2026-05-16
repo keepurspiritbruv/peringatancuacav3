@@ -51,24 +51,25 @@ class InferenceEngine:
             'Number of Experience with Disaster Status': self.df_community.loc[self.df_community['Mapped Beach'] == 'pantai samas', 'Number of Experience with Disaster Status'].iloc[0],
         }                                                       
 
-    def get_lik_sign_description(self, lik_codes: list) -> list:
-        """
-        Return list of dictionaries containing code and description for each detected LIK sign.
-        """
-        lik_code_list = {
-            "wn-1": "Awan tampak turun ke bawah membentuk gumpalan 3 kali",
-            "wn-2": "Awan bergumpal dalam beberapa kelompok yang tampak saling mendekat atau menyatu",
-            "wn-3": "Kilat muncul di salah satu sisi langit ataupun saling berbalas antara dua sisi",
-            "wn-4": "Gelombang laut berubah pola dari kecil dan sering hingga besar dan rapat",
-            "wn-5": "Lumba-lumba mendekati perahu, seolah menggiring perahu",
-            "wn-6": "Burung camar terbang tergesa sambil bersuara keras",
-            "wn-7": "Pada masa peralihan angin barat ke angin timur",
-            "wn-8": "Langit mendung namun tidak terlalu gelap",
-            "wn-9": "Hujan atau langit tertutup awan tebal, saat angin timur",
-            "wn-13": "Bintang tidak terlihat di malam hari, saat angin timur",
-        }
-        return [{"code": code.upper(), "description": lik_code_list[code.lower()]} 
-                for code in lik_codes if code.lower() in lik_code_list]
+    LIK_LABELS = {
+        "wn-1": {"label_id": "Awan Turun", "label_en": "Falling Clouds", "detail_id": "Awan tampak turun ke bawah membentuk gumpalan 3 kali", "detail_en": "Clouds appear to descend forming clusters 3 times"},
+        "wn-2": {"label_id": "Awan Bergumpal", "label_en": "Clustered Clouds", "detail_id": "Awan bergumpal dalam beberapa kelompok yang tampak saling mendekat atau menyatu", "detail_en": "Clouds cluster in groups that appear to approach or merge"},
+        "wn-3": {"label_id": "Kilat", "label_en": "Lightning", "detail_id": "Kilat muncul di salah satu sisi langit ataupun saling berbalas antara dua sisi", "detail_en": "Lightning appears on one side of the sky or flashes between two sides"},
+        "wn-4": {"label_id": "Ombak Besar", "label_en": "High Waves", "detail_id": "Gelombang laut berubah pola dari kecil dan sering hingga besar dan rapat", "detail_en": "Ocean waves change pattern from small and frequent to large and dense"},
+        "wn-5": {"label_id": "Lumba-lumba Mendekat", "label_en": "Approaching Dolphins", "detail_id": "Lumba-lumba mendekati perahu, seolah menggiring perahu", "detail_en": "Dolphins approach the boat, seemingly herding it"},
+        "wn-6": {"label_id": "Burung Camar", "label_en": "Seagulls", "detail_id": "Burung camar terbang tergesa sambil bersuara keras", "detail_en": "Seagulls fly hastily while calling loudly"},
+        "wn-7": {"label_id": "Peralihan Angin", "label_en": "Wind Transition", "detail_id": "Pada masa peralihan angin barat ke angin timur", "detail_en": "During the transition from west wind to east wind"},
+        "wn-8": {"label_id": "Langit Merah", "label_en": "Red Sky", "detail_id": "Langit mendung namun tidak terlalu gelap", "detail_en": "Sky is overcast but not too dark"},
+        "wn-9": {"label_id": "Bintang Redup", "label_en": "Dim Stars", "detail_id": "Hujan atau langit tertutup awan tebal, saat angin timur", "detail_en": "Rain or sky covered by thick clouds during east wind"},
+        "wn-13": {"label_id": "Ikan Naik", "label_en": "Fish Surfacing", "detail_id": "Bintang tidak terlihat di malam hari, saat angin timur", "detail_en": "Stars not visible at night during east wind"},
+    }
+
+    def get_lik_sign_info(self, lik_codes: list) -> list:
+        return [
+            {"code": code.upper(), **self.LIK_LABELS[code.lower()]}
+            for code in lik_codes
+            if code.lower() in self.LIK_LABELS
+        ]
 
     def predict(self, data: dict) -> dict:
         csv_path = Path(__file__).parent / 'lik_filtered_action_taken.csv'
@@ -131,23 +132,20 @@ class InferenceEngine:
         # Format output rekomendasi aksi
         if highest_level != -1:
             # Format sesuai instruksi: "LIK_code: action level: action response" atau kata-kata
-            action_recommendation = f"Berdasarkan indikasi: {self.get_lik_sign_description([trigger_code])[0]['description']}, direkomendasikan tindakan: {best_action}."
+            action_recommendation = f"Berdasarkan indikasi: {self.get_lik_sign_info([trigger_code])[0]['detail_id']}, direkomendasikan tindakan: {best_action}."
         else:
             action_recommendation = "Situasi aman. Tidak ada rekomendasi tindakan eskalasi tinggi saat ini."
 
         # ---------------------------------------------------------
         # Logic 3: Get Sign Description
         # ---------------------------------------------------------
-        desc_list = self.get_lik_sign_description(combined_codes)
-            
+        desc_list = self.get_lik_sign_info(combined_codes)
+
         extracted_descriptions = []
         if desc_list:
             for item in desc_list:
-                if isinstance(item, dict):
-                    extracted_descriptions.append(" - ".join([str(v) for v in item.values()]))
-                else:
-                    extracted_descriptions.append(str(item))
-                    
+                extracted_descriptions.append(" - ".join([str(item["code"]), str(item["detail_id"])]))
+
         sign_description_str = " | ".join(extracted_descriptions) if extracted_descriptions else "Tidak ada deskripsi tanda alam yang valid."
 
         # ---------------------------------------------------------
