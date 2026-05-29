@@ -181,8 +181,19 @@ void handleMqttMessage(char *topic, byte *payload, unsigned int length) {
   Serial.print("MQTT message on ");
   Serial.println(topic);
 
+  char jsonBuf[768];
+  if (length >= sizeof(jsonBuf)) {
+    Serial.println("Payload too large");
+    return;
+  }
+  memcpy(jsonBuf, payload, length);
+  jsonBuf[length] = '\0';
+
+  Serial.print("Raw: ");
+  Serial.println(jsonBuf);
+
   StaticJsonDocument<768> doc;
-  DeserializationError error = deserializeJson(doc, payload, length);
+  DeserializationError error = deserializeJson(doc, jsonBuf);
   if (error) {
     Serial.print("JSON parse failed: ");
     Serial.println(error.c_str());

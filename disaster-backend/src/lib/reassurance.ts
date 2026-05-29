@@ -1,8 +1,6 @@
 import { getDb } from "../db";
 import { schema } from "../db";
-import { eq } from "drizzle-orm";
-import { fetchBmkgWeather, fetchBmkgWarning, saveSnapshot, fetchXgboostPrediction, persistXgboostPrediction, getBeachBySlug } from "./bmkg";
-import type { XGBoostResult } from "./bmkg";
+import { fetchBmkgWeather, fetchBmkgWarning, saveSnapshot, getBeachBySlug } from "./bmkg";
 import type { BmkgWeatherData } from "./bmkg";
 
 type ShapResult = {
@@ -16,8 +14,6 @@ type ShapResult = {
 type ReassuranceResult = {
 	shapRisk: string;
 	bmkgRisk: string;
-	xgboostRisk: number | null;
-	xgboostLabel: string | null;
 	agreed: boolean;
 	finalLevel: "NORMAL" | "WASPADA" | "SIAGA" | "EKSTREM";
 	finalLevelNumeric: number;
@@ -36,6 +32,25 @@ function determineBmkgRisk(weather: { windSpeed: number | null } | null, hasWarn
 
 type FinalLevel = "NORMAL" | "WASPADA" | "SIAGA" | "EKSTREM";
 
+const LIK_LEVEL_MAP: Record<string, number> = {
+	"NORMAL": 0,
+	"WASPADA": 1,
+	"SIAGA": 2,
+	"EKSTREM": 3,
+	"ACTIONABLE": 2,
+	"HIGH": 2,
+	"UNSAFE": 2,
+	"MEDIUM": 1,
+	"LOW": 0,
+};
+
+const BMKG_LEVEL_MAP: Record<string, number> = {
+	"HIGH": 2,
+	"MEDIUM": 1,
+	"LOW": 0,
+	"UNKNOWN": 0,
+};
+
 const LEVEL_MAP: Record<number, FinalLevel> = {
 	0: "NORMAL",
 	1: "WASPADA",
@@ -44,38 +59,15 @@ const LEVEL_MAP: Record<number, FinalLevel> = {
 };
 
 function fusionDecision(
-	xgboostResult: XGBoostResult | null,
 	shapRisk: string,
 	bmkgRisk: string,
 ): { finalLevel: FinalLevel; finalLevelNumeric: number; agreed: boolean } {
-	const xgboostLevel = xgboostResult?.riskLevel ?? 0;
+	const likLevel = LIK_LEVEL_MAP[shapRisk.toUpperCase()] ?? 0;
+	const bmkgLevel = BMKG_LEVEL_MAP[bmkgRisk.toUpperCase()] ?? 0;
 
-	let score = xgboostLevel;
+	const score = Math.max(likLevel, bmkgLevel);
 
-	if (shapRisk === "HIGH" || shapRisk === "UNSAFE") {
-		score = Math.max(score, 2);
-	}
-
-	if (bmkgRisk === "HIGH") {
-		score = Math.max(score, 2);
-	} else if (bmkgRisk === "MEDIUM") {
-		score = Math.max(score, 1);
-	}
-
-	let highCount = 0;
-	if (xgboostLevel >= 2) highCount++;
-	if (shapRisk === "HIGH" || shapRisk === "UNSAFE") highCount++;
-	if (bmkgRisk === "HIGH") highCount++;
-
-	if (highCount >= 2) {
-		score = Math.min(score + 1, 3);
-	}
-
-	score = Math.min(Math.max(score, 0), 3);
-
-	const agreed = (shapRisk === "HIGH" || shapRisk === "UNSAFE")
-		? bmkgRisk === "HIGH" || bmkgRisk === "MEDIUM" || (xgboostResult?.riskLevel ?? 0) >= 2
-		: bmkgRisk === "LOW" && (xgboostResult?.riskLevel ?? 0) < 2;
+	const agreed = likLevel === bmkgLevel;
 
 	return {
 		finalLevel: LEVEL_MAP[score],
@@ -105,31 +97,18 @@ export async function reassure(
 		await saveSnapshot(beachId, { weather, warning }).catch(() => {});
 	}
 
-	let xgboostResult: XGBoostResult | null = null;
-	if (weather) {
-		xgboostResult = await fetchXgboostPrediction(beachSlug, weather);
-	}
-
-	if (beachId && xgboostResult) {
-		await persistXgboostPrediction(beachId, xgboostResult).catch((err) => {
-			console.warn("[reassurance] Failed to persist XGBoost prediction:", err);
-		});
-	}
-
 	const shapRisk = shapResult.riskLevel.toUpperCase();
 	const bmkgRisk = determineBmkgRisk(weather, !!warning);
 
-	const { finalLevel, finalLevelNumeric, agreed } = fusionDecision(xgboostResult, shapRisk, bmkgRisk);
+	const { finalLevel, finalLevelNumeric, agreed } = fusionDecision(shapRisk, bmkgRisk);
 
 	const result: ReassuranceResult = {
 		shapRisk,
 		bmkgRisk,
-		xgboostRisk: xgboostResult?.riskLevel ?? null,
-		xgboostLabel: xgboostResult?.riskLabel ?? null,
 		agreed,
 		finalLevel,
 		finalLevelNumeric,
-		details: { weather, warning, xgboost: xgboostResult },
+		details: { weather, warning },
 	};
 
 	await db.insert(schema.reassuranceResults).values({

@@ -50,7 +50,6 @@ services:
       DATABASE_URL: sqlite:///app/data/disaster.db
       BASE_URL: http://localhost:3000
       JWT_AUTH_ENABLED: "false"
-      XGBOOST_BASE_URL: http://ml:8000
       ENABLE_IOT_MQTT_DELIVERY: "true"
       MQTT_BROKER_URL: mqtt://mosquitto:1883
       MQTT_TOPIC_PREFIX: alert

@@ -40,20 +40,6 @@ export const bmkgSnapshots = sqliteTable("bmkg_snapshots", {
 	fetchedAt: text("fetched_at").default(sql`(datetime('now'))`).notNull(),
 });
 
-export const xgboostPredictions = sqliteTable("xgboost_predictions", {
-	id: integer("id").primaryKey({ autoIncrement: true }),
-	beachId: integer("beach_id").references(() => beaches.id),
-	riskLevel: integer("risk_level").notNull(),
-	riskLabel: text("risk_label").notNull(),
-	confidence: real("confidence"),
-	source: text("source").notNull(),
-	thresholdLabel: integer("threshold_label"),
-	modelAgrees: integer("model_agrees", { mode: "boolean" }),
-	featureImportance: text("feature_importance").$type<Record<string, number>>(),
-	rawFeatures: text("raw_features").$type<Record<string, unknown>>(),
-	createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
-});
-
 export const reassuranceResults = sqliteTable("reassurance_results", {
 	id: integer("id").primaryKey({ autoIncrement: true }),
 	predictionId: integer("prediction_id"),

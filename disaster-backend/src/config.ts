@@ -2,7 +2,7 @@ export const PORT = Number(process.env.PORT ?? 3000);
 export const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 export const DATABASE_URL = process.env.DATABASE_URL ?? "sqlite://./data/disaster.db";
 export const ML_BASE_URL = process.env.ML_BASE_URL ?? "http://localhost:8000";
-export const XGBOOST_BASE_URL = process.env.XGBOOST_BASE_URL ?? ML_BASE_URL;
+
 export const BMKG_CACHE_TTL_SECONDS = Number(process.env.BMKG_CACHE_TTL_SECONDS ?? 30 * 60);
 export const BMKG_API_URL = process.env.BMKG_API_URL ?? "https://api.bmkg.go.id/publik/prakiraan-cuaca";
 
