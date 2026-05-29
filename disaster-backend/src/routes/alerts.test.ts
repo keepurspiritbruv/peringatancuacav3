@@ -31,10 +31,11 @@ describe("GET /alerts", () => {
 	});
 
 	test("maps stream entries to alert objects correctly", async () => {
+		const now = Date.now();
 		const payload = {
 			eventType: "DISASTER_ALERT",
 			alertId: "test-alert-1",
-			serverTimestamp: 1000000,
+			serverTimestamp: now,
 			decision: { community_characteristics: "Low Actionable", shouldDistribute: true },
 			input: { beach_location: "pantai_lampuuk", lik_codes: ["wn-1"] },
 			ml: {
@@ -45,7 +46,7 @@ describe("GET /alerts", () => {
 		};
 
 		mockXRrange.mockResolvedValue([
-			{ id: "1000000-0", message: { json: JSON.stringify(payload) } },
+			{ id: `${now}-0`, message: { json: JSON.stringify(payload) } },
 		]);
 
 		const res = await app.request("/api/alerts");
@@ -66,9 +67,10 @@ describe("GET /alerts", () => {
 	});
 
 	test("returns most recent alerts first (reversed)", async () => {
+		const now = Date.now();
 		mockXRrange.mockResolvedValue([
-			{ id: "1000-0", message: { json: JSON.stringify({ alertId: "old", serverTimestamp: 1000 }) } },
-			{ id: "2000-0", message: { json: JSON.stringify({ alertId: "new", serverTimestamp: 2000 }) } },
+			{ id: `${now - 1000}-0`, message: { json: JSON.stringify({ alertId: "old", serverTimestamp: now - 1000 }) } },
+			{ id: `${now}-0`, message: { json: JSON.stringify({ alertId: "new", serverTimestamp: now }) } },
 		]);
 
 		const res = await app.request("/api/alerts");

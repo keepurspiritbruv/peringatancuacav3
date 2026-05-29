@@ -4,6 +4,7 @@ import { sendOpenClawAlert } from "../lib/openclaw";
 import { processReport, getActiveWarning, setActiveWarning, getReportTimeRange } from "../lib/crowdsource";
 import { persistReport, persistShapPrediction } from "../lib/bmkg";
 import { reassure } from "../lib/reassurance";
+import { publishIotAlertForEvent } from "../lib/iot-mqtt";
 import {
 	ALERTS_CHANNEL,
 	ALERTS_STREAM,
@@ -398,6 +399,10 @@ route.post("/report", async (c) => {
 		console.log("[report] publishing to Redis channel", ALERTS_CHANNEL, "channel:", channel, "alertId:", alertEvent.alertId);
 		await redis.publish(ALERTS_CHANNEL, alertJson);
 		console.log("[report] published OK");
+		const iotResult = await publishIotAlertForEvent(alertEvent);
+		if (iotResult.published) {
+			console.log("[report] published IoT MQTT alert", iotResult.topic);
+		}
 
 		if (channel !== "WHATSAPP") {
 			const alertText = formatWhatsAppAlert({

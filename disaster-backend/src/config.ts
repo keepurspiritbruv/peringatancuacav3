@@ -38,6 +38,22 @@ export const PUSH_SUBSCRIPTIONS_HASH = process.env.PUSH_SUBSCRIPTIONS_HASH ?? "a
 export const ENABLE_SSE_DELIVERY = parseBoolEnv(process.env.ENABLE_SSE_DELIVERY, true);
 export const ENABLE_WS_DELIVERY = parseBoolEnv(process.env.ENABLE_WS_DELIVERY, true);
 export const ENABLE_PUSH_DELIVERY = parseBoolEnv(process.env.ENABLE_PUSH_DELIVERY, true);
+export const ENABLE_IOT_MQTT_DELIVERY = parseBoolEnv(process.env.ENABLE_IOT_MQTT_DELIVERY, false);
+
+function parseMqttQosEnv(value: string | undefined): 0 | 1 | 2 {
+	const parsed = Number(value ?? 1);
+	if (parsed === 0 || parsed === 1 || parsed === 2) return parsed;
+	return 1;
+}
+
+export const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL ?? "mqtt://localhost:1883";
+export const MQTT_TOPIC_PREFIX = process.env.MQTT_TOPIC_PREFIX ?? "alert";
+export const MQTT_QOS = parseMqttQosEnv(process.env.MQTT_QOS);
+export const MQTT_RETAIN = parseBoolEnv(process.env.MQTT_RETAIN, false);
+export const MQTT_ALARM_DURATION_MS = Number(process.env.MQTT_ALARM_DURATION_MS ?? 15000);
+export const MQTT_PUBLISH_TIMEOUT_MS = Number(process.env.MQTT_PUBLISH_TIMEOUT_MS ?? 2000);
+export const MQTT_USERNAME = process.env.MQTT_USERNAME ?? "";
+export const MQTT_PASSWORD = process.env.MQTT_PASSWORD ?? "";
 
 export const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "";
 export const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";

@@ -13,6 +13,7 @@ Distribution Hub for disaster reporting experiments:
 - API framework: Hono
 - Data/logging: Redis (Pub/Sub + Streams + Hash)
 - ML integration: external/internal HTTP service (`POST /predict`)
+- IoT delivery: MQTT.js publisher to Mosquitto
 
 ## Architecture (High Level)
 
@@ -22,8 +23,9 @@ Distribution Hub for disaster reporting experiments:
 4. Backend writes `alertEvent` to Redis stream (`alerts:stream`)
 5. If distributable, backend publishes to Redis Pub/Sub channel (`alerts:high`)
 6. Connected SSE/WS clients receive the same payload; push subscribers receive notification
-7. Clients send `POST /api/ack`; backend logs ACK stream (`alerts:acks`)
-8. Offline/sync evidence is logged to `reports:sync`
+7. For `SIAGA` and `EKSTREM`, backend publishes an IoT command to MQTT topic `alert/<beach_location>`
+8. Clients send `POST /api/ack`; backend logs ACK stream (`alerts:acks`)
+9. Offline/sync evidence is logged to `reports:sync`
 
 ## Prerequisites
 
@@ -95,6 +97,13 @@ PUSH_SUBSCRIPTIONS_HASH=alerts:push:subscriptions
 ENABLE_SSE_DELIVERY=true
 ENABLE_WS_DELIVERY=true
 ENABLE_PUSH_DELIVERY=true
+ENABLE_IOT_MQTT_DELIVERY=false
+MQTT_BROKER_URL=mqtt://localhost:1883
+MQTT_TOPIC_PREFIX=alert
+MQTT_QOS=1
+MQTT_RETAIN=false
+MQTT_ALARM_DURATION_MS=15000
+MQTT_PUBLISH_TIMEOUT_MS=2000
 # Optional JWT auth for /api/*
 JWT_AUTH_ENABLED=false
 JWT_SECRET=replace-with-long-random-secret

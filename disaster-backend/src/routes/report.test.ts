@@ -13,6 +13,7 @@ const mockPublish = mock<() => Promise<number>>();
 const mockGet = mock<() => Promise<string | null>>();
 const mockSet = mock<() => Promise<string | null>>();
 const mockDel = mock<() => Promise<number>>();
+const mockPublishIotAlertForEvent = mock<() => Promise<{ published: boolean; reason?: string; topic?: string }>>();
 
 mock.module("../lib/redis", () => ({
 	redis: {
@@ -42,6 +43,10 @@ mock.module("../lib/reassurance", () => ({
 
 mock.module("../lib/openclaw", () => ({
 	sendOpenClawAlert: mock(async () => {}),
+}));
+
+mock.module("../lib/iot-mqtt", () => ({
+	publishIotAlertForEvent: mockPublishIotAlertForEvent,
 }));
 
 mock.module("../config", () => ({
@@ -74,6 +79,8 @@ describe("POST /api/report", () => {
 		mockGet.mockClear();
 		mockSet.mockClear();
 		mockDel.mockClear();
+		mockPublishIotAlertForEvent.mockClear();
+		mockPublishIotAlertForEvent.mockResolvedValue({ published: false, reason: "disabled" });
 	});
 
 	test("rejects missing lik_codes", async () => {
@@ -193,6 +200,47 @@ describe("POST /api/report", () => {
 		expect(body.alertEvent.firstReportAt).toBe(1000);
 		expect(body.alertEvent.lastReportAt).toBe(2000);
 		expect(mockPublish).toHaveBeenCalled();
+	});
+
+	test("publishes triggered SIAGA alerts to MQTT IoT channel", async () => {
+		mockProcessReport.mockResolvedValue({ triggeredCodes: ["Wn-1"], codeCounts: { "Wn-1": 5 } });
+		mockGetActiveWarning.mockResolvedValue(null);
+		mockGetReportTimeRange.mockResolvedValue({ firstReportAt: 1000, lastReportAt: 2000 });
+		mockPersistReport.mockResolvedValue({ id: "report-1" });
+		mockPersistShapPrediction.mockResolvedValue({ id: 1 });
+		mockReassure.mockResolvedValue({ finalLevel: "SIAGA", agreed: true });
+		mockXAdd.mockResolvedValue("0-0");
+		mockPublish.mockResolvedValue(1);
+		mockSet.mockResolvedValue("OK");
+		mockPublishIotAlertForEvent.mockResolvedValue({ published: true, topic: "alert/pantai_lampuuk" });
+
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = mock(async (url: string) => {
+			if (url.includes("/predict")) {
+				return new Response(JSON.stringify({
+					active_warning: ["Wn-1"],
+					sign_description: "Awan gelap",
+					community_characteristics: "Actionable",
+					action_recommendation: "Siaga penuh",
+					triggered_lik_codes: ["Wn-1"],
+				}), { status: 200, headers: { "content-type": "application/json" } });
+			}
+			return new Response("not found", { status: 404 });
+		}) as unknown as typeof fetch;
+
+		const res = await app.request("/api/report", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ beach_location: "pantai_lampuuk", lik_codes: ["Wn-1"] }),
+		});
+
+		globalThis.fetch = originalFetch;
+
+		expect(res.status).toBe(200);
+		expect(mockPublishIotAlertForEvent).toHaveBeenCalledTimes(1);
+		const alertEvent = mockPublishIotAlertForEvent.mock.calls[0][0] as Record<string, unknown>;
+		expect(alertEvent.beachLocation).toBe("pantai_lampuuk");
+		expect((alertEvent.reassurance as Record<string, unknown>).finalLevel).toBe("SIAGA");
 	});
 
 	test("returns 502 when ML fails", async () => {

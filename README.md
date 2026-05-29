@@ -20,6 +20,7 @@ PWA (Nelayan) --> POST /report --> Backend (Hono + Redis)
                                       +--> BMKG API (data cuaca)
                                       +--> OpenClaw (broadcast WhatsApp)
                                       +--> PWA (SSE real-time alerts)
+                                      +--> ESP32 (MQTT via Mosquitto)
 ```
 
 ## Folder
@@ -78,11 +79,12 @@ git submodule update --init --recursive
 docker compose up -d --build
 ```
 
-Ini akan menjalankan 4 container:
+Ini akan menjalankan container utama berikut:
 
 | Service | Container | Port | Deskripsi |
 |---------|-----------|------|-----------|
 | Redis | `thesis-redis` | `127.0.0.1:6379` | Queue, SSE, cooldown, active warnings |
+| Mosquitto | `peringatan-mosquitto` | `1883` (local compose) | MQTT broker untuk ESP32/IoT |
 | SHAP ML API | `thesis-ml` | internal only | Prediksi risiko berbasis SHAP |
 | Backend | `thesis-backend` | `127.0.0.1:3000` | Hono API, report processing, SQLite DB |
 | Frontend | `thesis-frontend` | `127.0.0.1:3001` | Next.js PWA |
@@ -118,6 +120,42 @@ done
 
 Setelah 5 report, alert akan muncul di homepage.
 
+### 6.1 Test MQTT IoT dengan Mosquitto
+
+Local compose membuka Mosquitto di port `1883`. Jalankan stack lokal:
+
+```bash
+docker compose -f docker-compose.local.yml up -d --build
+```
+
+Pantau pesan IoT:
+
+```bash
+docker compose -f docker-compose.local.yml exec mosquitto \
+  mosquitto_sub -h localhost -t 'alert/#' -v
+```
+
+Kirim pesan test langsung ke ESP32:
+
+```bash
+docker compose -f docker-compose.local.yml exec mosquitto \
+  mosquitto_pub -h localhost -t alert/pantai_lampuuk \
+  -m '{"command":"ALARM_ON","riskLevel":"SIAGA","durationMs":15000}'
+```
+
+Backend hanya menerbitkan MQTT untuk `SIAGA` dan `EKSTREM`. Level `NORMAL` dan `WASPADA` tidak menyalakan buzzer.
+
+Untuk ESP32, buka [`arduino/iot.ino`](arduino/iot.ino), install library Arduino `PubSubClient` dan `ArduinoJson`, lalu isi:
+
+```cpp
+const char *WIFI_SSID = "nama-wifi";
+const char *WIFI_PASSWORD = "password-wifi";
+const char *MQTT_HOST = "IP_LAPTOP_ATAU_VPS";
+const char *MQTT_TOPIC = "alert/pantai_lampuuk";
+```
+
+Jika ESP32 berada di jaringan Wi-Fi yang sama dengan laptop, gunakan IP LAN laptop, bukan `localhost`.
+
 ### 7. Reset Data
 
 ```bash
@@ -151,6 +189,14 @@ JWT_SECRET=
 VAPID_SUBJECT=mailto:you@example.com
 VAPID_PUBLIC_KEY=your-public-key
 VAPID_PRIVATE_KEY=your-private-key
+
+# IoT MQTT
+ENABLE_IOT_MQTT_DELIVERY=true
+MQTT_BROKER_URL=mqtt://mosquitto:1883
+MQTT_TOPIC_PREFIX=alert
+MQTT_QOS=1
+MQTT_RETAIN=false
+MQTT_ALARM_DURATION_MS=15000
 ```
 
 ---

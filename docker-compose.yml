@@ -12,6 +12,13 @@ services:
       timeout: 3s
       retries: 10
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: peringatan-mosquitto
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
   ml:
     build:
       context: ./SHAP-model-api
@@ -46,11 +53,20 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       XGBOOST_BASE_URL: http://ml:8000
+      ENABLE_IOT_MQTT_DELIVERY: ${ENABLE_IOT_MQTT_DELIVERY:-true}
+      MQTT_BROKER_URL: ${MQTT_BROKER_URL:-mqtt://mosquitto:1883}
+      MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-alert}
+      MQTT_QOS: ${MQTT_QOS:-1}
+      MQTT_RETAIN: ${MQTT_RETAIN:-false}
+      MQTT_ALARM_DURATION_MS: ${MQTT_ALARM_DURATION_MS:-15000}
+      MQTT_PUBLISH_TIMEOUT_MS: ${MQTT_PUBLISH_TIMEOUT_MS:-2000}
     volumes:
       - backend_data:/app/data
     depends_on:
       redis:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
       ml:
         condition: service_healthy
     networks:

@@ -14,6 +14,15 @@ services:
     ports:
       - "6379:6379"
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: peringatan-mosquitto
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+
   ml:
     build:
       context: ./SHAP-model-api
@@ -42,11 +51,20 @@ services:
       BASE_URL: http://localhost:3000
       JWT_AUTH_ENABLED: "false"
       XGBOOST_BASE_URL: http://ml:8000
+      ENABLE_IOT_MQTT_DELIVERY: "true"
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      MQTT_TOPIC_PREFIX: alert
+      MQTT_QOS: "1"
+      MQTT_RETAIN: "false"
+      MQTT_ALARM_DURATION_MS: "15000"
+      MQTT_PUBLISH_TIMEOUT_MS: "2000"
     volumes:
       - backend_data:/app/data
     depends_on:
       redis:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
       ml:
         condition: service_healthy
     ports:

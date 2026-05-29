@@ -33,6 +33,7 @@
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "hono": "^4.11.7",
+    "mqtt": "5.15.1",
     "redis": "^5.10.0",
     "uuid": "^13.0.0",
     "web-push": "^3.6.7"
