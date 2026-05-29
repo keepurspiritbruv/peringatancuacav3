@@ -211,6 +211,24 @@ route.get("/report/submit", async (c) => {
 		console.log("[report-submit] published IoT MQTT alert", iotResult.topic);
 	}
 
+	if (isWA) {
+		const riskLabel =
+			alertEvent.riskLevel === "siaga" || alertEvent.riskLevel === "ekstrem"
+				? "🔴 BAHAYA"
+				: alertEvent.riskLevel === "waspada"
+					? "🟡 WASPADA"
+					: "✅ Aman";
+		const alertText = [
+			`⚠️ PERINGATAN — ${riskLabel} di ${beachLocation.replace(/_/g, " ")}`,
+			`👥 Dilaporkan oleh ${alertEvent.reporterCount} nelayan`,
+			`Tanda: ${triggeredCodes.join(", ")}`,
+			`Rekomendasi: ${alertEvent.ml?.action_recommendation ?? "Tidak ada rekomendasi"}`,
+			"Peringatan sedang dikirim ke semua nelayan.",
+		].join("\n");
+		await sendOpenClawAlert(alertText);
+		console.log("[report-submit] sent WhatsApp alert broadcast");
+	}
+
 	await resetQueues(beachLocation, triggeredCodes);
 	console.log("[report-submit] reset queues for", beachLocation, "codes:", triggeredCodes);
 
