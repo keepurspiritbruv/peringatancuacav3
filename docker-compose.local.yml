@@ -1,0 +1,72 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: peringatan-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  ml:
+    build:
+      context: ./SHAP-model-api
+      dockerfile: Dockerfile
+    container_name: peringatan-ml
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./disaster-backend
+      dockerfile: Dockerfile
+    container_name: peringatan-backend
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      REDIS_URL: redis://redis:6379
+      ML_BASE_URL: http://ml:8000
+      DATABASE_URL: sqlite:///app/data/disaster.db
+      BASE_URL: http://localhost:3000
+      JWT_AUTH_ENABLED: "false"
+      XGBOOST_BASE_URL: http://ml:8000
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      ml:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://backend:3000
+    container_name: peringatan-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:3000
+    depends_on:
+      - backend
+    ports:
+      - "3001:3001"
+
+volumes:
+  redis_data:
+  backend_data:

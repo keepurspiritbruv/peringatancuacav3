@@ -77,6 +77,19 @@ function createTablesIfNotExist(sqlite: Database) {
 			warning TEXT,
 			fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);
+		CREATE TABLE IF NOT EXISTS xgboost_predictions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			beach_id INTEGER REFERENCES beaches(id),
+			risk_level INTEGER NOT NULL,
+			risk_label TEXT NOT NULL,
+			confidence REAL,
+			source TEXT NOT NULL,
+			threshold_label INTEGER,
+			model_agrees BOOLEAN,
+			feature_importance TEXT,
+			raw_features TEXT,
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		);
 		CREATE TABLE IF NOT EXISTS reassurance_results (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			prediction_id INTEGER,

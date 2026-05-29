@@ -47,3 +47,7 @@ disaster-backend/index.js
 bun.lock
 package-lock.json
 nul
+
+# Kaggle credentials
+*kaggle*.json
+*.pkl

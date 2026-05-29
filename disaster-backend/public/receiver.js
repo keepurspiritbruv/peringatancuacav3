@@ -78,7 +78,9 @@ function connectSse() {
   sse.addEventListener("alert", async (event) => {
     try {
       const payload = JSON.parse(event.data);
-      log(`SSE alert ${payload.alertId}`);
+      const re = payload.reassurance;
+      const level = (payload.decision?.final_risk_level || "NORMAL").toUpperCase();
+      log(`SSE ALERT [${level}] ${payload.beachLocation} | SHAP=${re?.shapRisk || "-"} BMKG=${re?.bmkgRisk || "-"} XGB=${re?.xgboostLabel || "-"}(${re?.xgboostRisk ?? "-"}) conf=${re?.details?.xgboost?.confidence ? (re.details.xgboost.confidence * 100).toFixed(1) + "%" : "-"} | fusion=${re?.finalLevel || "-"}`);
       await postAck(payload, "SSE");
       log(`SSE ACK sent ${payload.alertId}`);
     } catch (error) {
@@ -120,7 +122,9 @@ function connectWs() {
         return;
       }
 
-      log(`WS alert ${payload.alertId}`);
+      const re = payload.reassurance;
+      const level = (payload.decision?.final_risk_level || "NORMAL").toUpperCase();
+      log(`WS ALERT [${level}] ${payload.beachLocation} | SHAP=${re?.shapRisk || "-"} BMKG=${re?.bmkgRisk || "-"} XGB=${re?.xgboostLabel || "-"}(${re?.xgboostRisk ?? "-"}) conf=${re?.details?.xgboost?.confidence ? (re.details.xgboost.confidence * 100).toFixed(1) + "%" : "-"} | fusion=${re?.finalLevel || "-"}`);
       await postAck(payload, "WS");
       log(`WS ACK sent ${payload.alertId}`);
     } catch (error) {

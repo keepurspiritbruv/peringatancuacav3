@@ -150,9 +150,8 @@ route.get("/report/submit", async (c) => {
 
 	const isMultisign = triggeredCodes.length > 1;
 	const isActionable = result.community_characteristics === "Actionable";
-	const riskLevel = isActionable
-		? (isMultisign ? "unsafe-high" : "unsafe")
-		: "safe";
+	const reassuranceFinalLevel = (reassuranceResult?.finalLevel as string) ?? "NORMAL";
+	const riskLevel = reassuranceFinalLevel.toLowerCase();
 	const reporterCount = Object.values(codeCounts).reduce((sum, count) => sum + count, 0);
 	const timeRange = await getReportTimeRange(beachLocation, triggeredCodes);
 
@@ -176,7 +175,8 @@ route.get("/report/submit", async (c) => {
 			community_characteristics: result.community_characteristics,
 			is_multisign: isMultisign,
 			is_actionable: isActionable,
-			shouldDistribute: true,
+			final_risk_level: reassuranceFinalLevel,
+			shouldDistribute: reassuranceFinalLevel !== "NORMAL",
 		},
 		input: mlPayload,
 		ml: result,

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const beaches = sqliteTable("beaches", {
@@ -38,6 +38,20 @@ export const bmkgSnapshots = sqliteTable("bmkg_snapshots", {
 	waveForecast: text("wave_forecast").$type<Record<string, unknown>>(),
 	warning: text("warning").$type<Record<string, unknown>>(),
 	fetchedAt: text("fetched_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+export const xgboostPredictions = sqliteTable("xgboost_predictions", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	beachId: integer("beach_id").references(() => beaches.id),
+	riskLevel: integer("risk_level").notNull(),
+	riskLabel: text("risk_label").notNull(),
+	confidence: real("confidence"),
+	source: text("source").notNull(),
+	thresholdLabel: integer("threshold_label"),
+	modelAgrees: integer("model_agrees", { mode: "boolean" }),
+	featureImportance: text("feature_importance").$type<Record<string, number>>(),
+	rawFeatures: text("raw_features").$type<Record<string, unknown>>(),
+	createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
 export const reassuranceResults = sqliteTable("reassurance_results", {

@@ -129,6 +129,64 @@ export async function persistReport(data: {
 	return inserted[0];
 }
 
+export type XGBoostResult = {
+	riskLevel: number;
+	riskLabel: string;
+	confidence: number;
+	source: string;
+	thresholdLabel: number;
+	modelAgrees: boolean;
+	featureImportance: Record<string, number> | null;
+};
+
+export async function fetchXgboostPrediction(beachSlug: string, weatherData: BmkgWeatherData): Promise<XGBoostResult | null> {
+	const { XGBOOST_BASE_URL } = await import("../config");
+	try {
+		const res = await fetch(`${XGBOOST_BASE_URL}/xgboost/predict`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				beach_location: beachSlug,
+				curah_hujan: 0,
+				kelembapan: weatherData.humidity ?? 0,
+				suhu: weatherData.temperature ?? 0,
+				kecepatan_angin_kmh: weatherData.windSpeed ?? 0,
+				arah_angin: weatherData.windDirection ?? "N",
+				tutupan_awan: 0,
+			}),
+			signal: AbortSignal.timeout(10000),
+		});
+		if (!res.ok) return null;
+		const raw = await res.json() as Record<string, unknown>;
+		return {
+			riskLevel: (raw.risk_level as number) ?? 0,
+			riskLabel: (raw.risk_label as string) ?? "Unknown",
+			confidence: (raw.confidence as number) ?? 0,
+			source: (raw.source as string) ?? "xgboost",
+			thresholdLabel: (raw.threshold_label as number) ?? 0,
+			modelAgrees: (raw.model_agrees as boolean) ?? false,
+			featureImportance: (raw.feature_importance as Record<string, number>) ?? null,
+		};
+	} catch {
+		return null;
+	}
+}
+
+export async function persistXgboostPrediction(beachId: number, result: XGBoostResult) {
+	const db = getDb();
+	await db.insert(schema.xgboostPredictions).values({
+		beachId,
+		riskLevel: result.riskLevel,
+		riskLabel: result.riskLabel,
+		confidence: result.confidence,
+		source: result.source,
+		thresholdLabel: result.thresholdLabel,
+		modelAgrees: result.modelAgrees,
+		featureImportance: result.featureImportance ? JSON.stringify(result.featureImportance) : null,
+		rawFeatures: JSON.stringify(result),
+	});
+}
+
 export async function persistShapPrediction(data: {
 	reportId: string;
 	riskLevel: string;

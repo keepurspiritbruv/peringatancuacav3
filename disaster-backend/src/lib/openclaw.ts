@@ -1,32 +1,24 @@
-import { OPENCLAW_GATEWAY_URL, OPENCLAW_HOOK_TOKEN, OPENCLAW_BROADCAST_GROUPS } from "../config";
+import { OPENCLAW_BROADCAST_GROUPS } from "../config";
+import { redis } from "./redis";
+
+const OUTBOUND_STREAM = "openclaw:outbound";
 
 export async function sendOpenClawAlert(text: string): Promise<void> {
-	if (!OPENCLAW_GATEWAY_URL || !OPENCLAW_HOOK_TOKEN) {
-		console.warn("[openclaw] OpenClaw not configured, skipping broadcast");
-		return;
-	}
+	await redis.xAdd(OUTBOUND_STREAM, "*", {
+		text,
+		target: OPENCLAW_BROADCAST_GROUPS.join(","),
+		timestamp: String(Date.now()),
+		type: "broadcast",
+	});
+	console.log(`[openclaw] queued broadcast: ${(text || "").substring(0, 60)}`);
+}
 
-	for (const chatId of OPENCLAW_BROADCAST_GROUPS) {
-		try {
-			const res = await fetch(`${OPENCLAW_GATEWAY_URL}/hooks/agent`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"Authorization": `Bearer ${OPENCLAW_HOOK_TOKEN}`,
-				},
-				body: JSON.stringify({
-					message: text,
-					channel: "whatsapp",
-					to: chatId,
-					deliver: true,
-				}),
-			});
-			if (!res.ok) {
-				const detail = await res.text().catch(() => "");
-				console.error(`[openclaw] hooks/agent failed for ${chatId}: ${res.status} ${detail}`);
-			}
-		} catch (err) {
-			console.error(`[openclaw] hooks/agent error for ${chatId}:`, err);
-		}
-	}
+export async function sendOpenClawReply(toChatId: string, text: string): Promise<void> {
+	await redis.xAdd(OUTBOUND_STREAM, "*", {
+		text,
+		target: toChatId,
+		timestamp: String(Date.now()),
+		type: "reply",
+	});
+	console.log(`[openclaw] queued reply to ${toChatId}: ${(text || "").substring(0, 60)}`);
 }

@@ -15,8 +15,10 @@ const route = new Hono();
 route.get("/alerts", async (c) => {
 	const limitParam = Number(c.req.query("limit") ?? "20");
 	const limit = Math.min(Math.max(limitParam, 1), 50);
+	const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+	const minId = `${twentyFourHoursAgo}-0`;
 
-	const events = await redis.xRange(ALERTS_STREAM, "-", "+", { COUNT: limit });
+	const events = await redis.xRange(ALERTS_STREAM, minId, "+", { COUNT: limit });
 
 	if (!events || events.length === 0) {
 		return c.json({ ok: true, data: [] });
@@ -28,6 +30,8 @@ route.get("/alerts", async (c) => {
 		const ml = parsed.ml as Record<string, unknown> | undefined;
 		const decision = parsed.decision as Record<string, unknown> | undefined;
 		const input = parsed.input as Record<string, unknown> | undefined;
+		const ts = (parsed.serverTimestamp as number) ?? 0;
+		if (ts < twentyFourHoursAgo) return null;
 
 		return {
 			alertId: (parsed.alertId as string) ?? "",
@@ -42,9 +46,9 @@ route.get("/alerts", async (c) => {
 			signDescription: (ml?.sign_description as string) ?? "",
 			triggeredCodes: ((ml?.triggered_lik_codes as string[]) ?? (input?.lik_codes as string[]) ?? []),
 			explanation: ml?.explanation as Record<string, unknown> | undefined,
-			serverTimestamp: (parsed.serverTimestamp as number) ?? 0,
+			serverTimestamp: ts,
 		};
-	});
+	}).filter(Boolean);
 
 	const sorted = alerts.reverse().slice(0, limit);
 	return c.json({ ok: true, data: sorted });

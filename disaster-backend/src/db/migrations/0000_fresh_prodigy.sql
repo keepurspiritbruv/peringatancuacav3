@@ -18,6 +18,21 @@ CREATE TABLE `bmkg_snapshots` (
 	FOREIGN KEY (`beach_id`) REFERENCES `beaches`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE TABLE `xgboost_predictions` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`beach_id` integer,
+	`risk_level` integer NOT NULL,
+	`risk_label` text NOT NULL,
+	`confidence` real,
+	`source` text NOT NULL,
+	`threshold_label` integer,
+	`model_agrees` integer,
+	`feature_importance` text,
+	`raw_features` text,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`beach_id`) REFERENCES `beaches`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
 CREATE TABLE `reassurance_results` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`prediction_id` integer,

@@ -434,11 +434,15 @@ async function handleSubmit(event) {
 
   try {
     const result = await sendReport(report);
-    if (result.status === "queued") {
-      log(`report received (queued, waiting for threshold) ${report.clientReportId}`);
-    } else {
-      log(`alert triggered! ${report.clientReportId}`);
-    }
+      if (result.status === "queued") {
+        log(`report received (queued, waiting for threshold) ${report.clientReportId}`);
+      } else {
+        const re = result.alertEvent?.reassurance;
+        const dec = result.alertEvent?.decision;
+        const level = (dec?.final_risk_level || "UNKNOWN").toUpperCase();
+        log(`alert triggered! ${report.clientReportId} → ${level} | SHAP=${re?.shapRisk || "-"} BMKG=${re?.bmkgRisk || "-"} XGB=${re?.xgboostLabel || "-"}(${re?.xgboostRisk ?? "-"}) fusion=${re?.finalLevel || "-"}`);
+        if (result.alertEvent) showAlertPanel(result.alertEvent);
+      }
   } catch (err) {
     log(`online send failed; queued ${report.clientReportId}: ${String(err)}`);
     await queueReport(report);
@@ -521,6 +525,63 @@ form.addEventListener("submit", (event) => {
   });
 });
 
+const RISK_COLORS = {
+  normal: "#16a34a",
+  waspada: "#f59e0b",
+  siaga: "#ea580c",
+  ekstrem: "#dc2626",
+};
+
+function showAlertPanel(alertEvent) {
+  const panel = document.getElementById("alert-panel");
+  const title = document.getElementById("alert-title");
+  const body = document.getElementById("alert-body");
+  if (!panel || !title || !body) return;
+
+  const re = alertEvent.reassurance;
+  const dec = alertEvent.decision;
+  const level = (dec?.final_risk_level || "NORMAL").toUpperCase();
+  const color = RISK_COLORS[level.toLowerCase()] || "#111";
+
+  panel.style.display = "block";
+  panel.style.borderColor = color;
+  title.textContent = `PERINGATAN: ${level}`;
+  title.style.color = color;
+
+  const rows = [];
+  rows.push(`<b>Lokasi:</b> ${alertEvent.beachLocation || "-"}`);
+  rows.push(`<b>Waktu:</b> ${new Date(alertEvent.serverTimestamp).toLocaleString("id-ID")}`);
+  rows.push(`<b>Pelapor:</b> ${alertEvent.reporterCount || 0} nelayan`);
+  if (re) {
+    rows.push(`<b>SHAP:</b> ${re.shapRisk || "-"}`);
+    rows.push(`<b>BMKG:</b> ${re.bmkgRisk || "-"}`);
+    rows.push(`<b>XGBoost:</b> ${re.xgboostLabel || "-"} (level ${re.xgboostRisk ?? "-"}) confidence ${re.details?.xgboost?.confidence ? (re.details.xgboost.confidence * 100).toFixed(1) + "%" : "-"}`);
+    rows.push(`<b>Fusion:</b> ${re.finalLevel || "-"}`);
+  }
+  body.innerHTML = rows.join("<br>");
+}
+
+function connectAlertSse() {
+  const token = getAuthToken();
+  const sseUrl = token ? `/api/sse?token=${encodeURIComponent(token)}` : "/api/sse";
+  const sse = new EventSource(sseUrl);
+
+  sse.addEventListener("alert", (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      showAlertPanel(payload);
+      log(`alert received: ${payload.decision?.final_risk_level || "?"} @ ${payload.beachLocation}`);
+    } catch (err) {
+      log(`alert parse error: ${String(err)}`);
+    }
+  });
+
+  sse.addEventListener("error", () => {
+    sse.close();
+    setTimeout(connectAlertSse, 5000);
+  });
+}
+
 (async () => {
   window.addEventListener("error", (event) => {
     log(`window error: ${event.message}`);
@@ -531,4 +592,5 @@ form.addEventListener("submit", (event) => {
   await setupServiceWorker();
   await refreshPushToggle();
   await flushQueue("app-open");
+  connectAlertSse();
 })();
