@@ -23,7 +23,7 @@ export const ALERTS_STREAM = process.env.ALERTS_STREAM ?? "alerts:stream";
 export const ACKS_STREAM = process.env.ACKS_STREAM ?? "alerts:acks";
 export const REPORT_SYNC_STREAM = process.env.REPORT_SYNC_STREAM ?? "reports:sync";
 export const REPORT_DEDUPE_PREFIX = process.env.REPORT_DEDUPE_PREFIX ?? "reports:dedupe";
-export const REPORT_WINDOW_MS = Number(process.env.REPORT_WINDOW_MS ?? 10 * 60 * 1000); // 10 minutes
+export const REPORT_WINDOW_MS = Number(process.env.REPORT_WINDOW_MS ?? 24 * 60 * 60 * 1000);
 export const REPORT_THRESHOLD = Number(process.env.REPORT_THRESHOLD ?? 5);
 
 export const BEACH_THRESHOLDS: Record<string, number> = {

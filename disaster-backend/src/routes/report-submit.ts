@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { redis } from "../lib/redis";
 import { sendOpenClawAlert } from "../lib/openclaw";
-import { processReport, getActiveWarning, setActiveWarning, getReportTimeRange } from "../lib/crowdsource";
+import { processReport, getActiveWarning, setActiveWarning, getReportTimeRange, resetQueues } from "../lib/crowdsource";
 import { persistReport, persistShapPrediction } from "../lib/bmkg";
 import { reassure } from "../lib/reassurance";
 import { publishIotAlertForEvent } from "../lib/iot-mqtt";
@@ -210,6 +210,9 @@ route.get("/report/submit", async (c) => {
 	if (iotResult.published) {
 		console.log("[report-submit] published IoT MQTT alert", iotResult.topic);
 	}
+
+	await resetQueues(beachLocation, triggeredCodes);
+	console.log("[report-submit] reset queues for", beachLocation, "codes:", triggeredCodes);
 
 	return c.json({
 		ok: true,
