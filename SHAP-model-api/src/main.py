@@ -51,7 +51,7 @@ async def predict(req: PredictRequest):
     bname = req.beach_name if req.beach_name else req.beach_location
 
     engine = LikInferenceEngine()
-    result = engine.evaluate(
+    result = engine.predict(
         beach_id=bid,
         beach_name=bname,
         reported_codes=codes
