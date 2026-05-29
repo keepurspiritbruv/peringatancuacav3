@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from engine.inference_engine import LikInferenceEngine
+from engine.inference_engine import InferenceEngine as LikInferenceEngine
 import sqlite3
 import json
 import os
