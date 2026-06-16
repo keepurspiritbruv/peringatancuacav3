@@ -145,13 +145,17 @@ route.get("/report/submit", async (c) => {
 			rawResponse: result as unknown as Record<string, unknown>,
 		}, beachLocation);
 		reassuranceResult = reassured as unknown as Record<string, unknown>;
-	} catch (pgErr) {
-		console.error("[report-submit] PostgreSQL persistence failed (non-blocking):", pgErr);
+	} catch (dbErr) {
+		console.error("[report-submit] SQLite persistence failed (non-blocking, alert still distributed via fail-safe level):", dbErr);
 	}
 
 	const isMultisign = triggeredCodes.length > 1;
 	const isActionable = result.community_characteristics === "Actionable";
-	const reassuranceFinalLevel = (reassuranceResult?.finalLevel as string) ?? "NORMAL";
+	// Fail safe if fusion/persistence failed: escalate actionable signs rather than
+	// silently downgrading to NORMAL (which would suppress the alert and the buzzer).
+	const reassuranceFinalLevel =
+		(reassuranceResult?.finalLevel as string) ??
+		(isActionable ? (isMultisign ? "SIAGA" : "WASPADA") : "NORMAL");
 	const riskLevel = reassuranceFinalLevel.toLowerCase();
 	const reporterCount = Object.values(codeCounts).reduce((sum, count) => sum + count, 0);
 	const timeRange = await getReportTimeRange(beachLocation, triggeredCodes);

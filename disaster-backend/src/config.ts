@@ -34,6 +34,10 @@ export const BEACH_THRESHOLDS: Record<string, number> = {
 	pantai_lhoknga: 5,
 };
 export const ACTIVE_WARNING_TTL_SECONDS = Number(process.env.ACTIVE_WARNING_TTL_SECONDS ?? 12 * 60 * 60); // 12 hours
+
+// Anonymous flood guard for /report (no auth required): max requests per IP per window.
+export const REPORT_RATE_LIMIT_MAX = Number(process.env.REPORT_RATE_LIMIT_MAX ?? 15);
+export const REPORT_RATE_LIMIT_WINDOW_SECONDS = Number(process.env.REPORT_RATE_LIMIT_WINDOW_SECONDS ?? 60);
 export const PUSH_SUBSCRIPTIONS_HASH = process.env.PUSH_SUBSCRIPTIONS_HASH ?? "alerts:push:subscriptions";
 export const ENABLE_SSE_DELIVERY = parseBoolEnv(process.env.ENABLE_SSE_DELIVERY, true);
 export const ENABLE_WS_DELIVERY = parseBoolEnv(process.env.ENABLE_WS_DELIVERY, true);
@@ -67,6 +71,16 @@ function parseCsvEnv(value: string | undefined, fallback: string[]) {
 		.filter((item) => item.length > 0);
 	return items.length > 0 ? items : fallback;
 }
+
+// CORS allowlist. The PWA calls /api same-origin via Next's proxy, so restricting
+// to the frontend origins blocks cross-origin browser abuse without affecting users.
+// Use "*" (single entry) to allow any origin.
+export const CORS_ALLOWED_ORIGINS = parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS, [
+	"https://samudraapp.id",
+	"https://www.samudraapp.id",
+	"http://localhost:3000",
+	"http://localhost:3001",
+]);
 
 export const JWT_AUTH_ENABLED = parseBoolEnv(process.env.JWT_AUTH_ENABLED, false);
 export const JWT_SECRET = process.env.JWT_SECRET ?? "";

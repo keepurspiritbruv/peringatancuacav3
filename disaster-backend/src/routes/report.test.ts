@@ -14,6 +14,9 @@ const mockGet = mock<() => Promise<string | null>>();
 const mockSet = mock<() => Promise<string | null>>();
 const mockDel = mock<() => Promise<number>>();
 const mockPublishIotAlertForEvent = mock<() => Promise<{ published: boolean; reason?: string; topic?: string }>>();
+const mockResetQueues = mock<() => Promise<void>>();
+const mockSendOpenClawAlert = mock<() => Promise<void>>();
+const mockCheckRateLimit = mock<() => Promise<{ allowed: boolean; count: number; limit: number }>>();
 
 mock.module("../lib/redis", () => ({
 	redis: {
@@ -30,6 +33,12 @@ mock.module("../lib/crowdsource", () => ({
 	getActiveWarning: mockGetActiveWarning,
 	setActiveWarning: mockSetActiveWarning,
 	getReportTimeRange: mockGetReportTimeRange,
+	resetQueues: mockResetQueues,
+}));
+
+mock.module("../lib/rate-limit", () => ({
+	checkReportRateLimit: mockCheckRateLimit,
+	getClientIp: (h: string | undefined | null) => h ?? "unknown",
 }));
 
 mock.module("../lib/bmkg", () => ({
@@ -42,7 +51,7 @@ mock.module("../lib/reassurance", () => ({
 }));
 
 mock.module("../lib/openclaw", () => ({
-	sendOpenClawAlert: mock(async () => {}),
+	sendOpenClawAlert: mockSendOpenClawAlert,
 }));
 
 mock.module("../lib/iot-mqtt", () => ({
@@ -59,6 +68,8 @@ mock.module("../config", () => ({
 	REPORT_THRESHOLD: 5,
 	BEACH_THRESHOLDS: { pantai_lampuuk: 5, pantai_ulee_lheue: 5, pantai_depok: 5, pantai_samas: 5, pantai_lhoknga: 5 },
 	ACTIVE_WARNING_TTL_SECONDS: 43200,
+	REPORT_RATE_LIMIT_MAX: 15,
+	REPORT_RATE_LIMIT_WINDOW_SECONDS: 60,
 }));
 
 import reportRoute from "./report";
@@ -81,6 +92,99 @@ describe("POST /api/report", () => {
 		mockDel.mockClear();
 		mockPublishIotAlertForEvent.mockClear();
 		mockPublishIotAlertForEvent.mockResolvedValue({ published: false, reason: "disabled" });
+		mockResetQueues.mockClear().mockResolvedValue(undefined);
+		mockSendOpenClawAlert.mockClear().mockResolvedValue(undefined);
+		mockCheckRateLimit.mockClear().mockResolvedValue({ allowed: true, count: 1, limit: 15 });
+	});
+
+	function mockTriggeredFetch(community = "Actionable") {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = mock(async (url: string) => {
+			if (url.includes("/predict")) {
+				return new Response(JSON.stringify({
+					active_warning: ["Wn-1"],
+					sign_description: "Awan gelap",
+					community_characteristics: community,
+					action_recommendation: "Segera evakuasi",
+					triggered_lik_codes: ["Wn-1"],
+				}), { status: 200, headers: { "content-type": "application/json" } });
+			}
+			return new Response("not found", { status: 404 });
+		}) as unknown as typeof fetch;
+		return () => { globalThis.fetch = originalFetch; };
+	}
+
+	function primeTriggered(finalLevel: string) {
+		mockProcessReport.mockResolvedValue({ triggeredCodes: ["Wn-1"], codeCounts: { "Wn-1": 5 } });
+		mockGetActiveWarning.mockResolvedValue(null);
+		mockGetReportTimeRange.mockResolvedValue({ firstReportAt: 1000, lastReportAt: 2000 });
+		mockPersistReport.mockResolvedValue({ id: "report-1" });
+		mockPersistShapPrediction.mockResolvedValue({ id: 1 });
+		mockReassure.mockResolvedValue({ finalLevel, agreed: true });
+		mockXAdd.mockResolvedValue("0-0");
+		mockPublish.mockResolvedValue(1);
+		mockSet.mockResolvedValue("OK");
+	}
+
+	test("returns 429 when the rate limit is exceeded", async () => {
+		mockCheckRateLimit.mockResolvedValue({ allowed: false, count: 16, limit: 15 });
+		const res = await app.request("/api/report", {
+			method: "POST",
+			headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9" },
+			body: JSON.stringify({ beach_location: "pantai_lampuuk", lik_codes: ["Wn-1"] }),
+		});
+		expect(res.status).toBe(429);
+		expect(mockProcessReport).not.toHaveBeenCalled();
+	});
+
+	test("resets the crowdsource queue after a triggered alert", async () => {
+		primeTriggered("SIAGA");
+		const restore = mockTriggeredFetch();
+		await app.request("/api/report", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ beach_location: "pantai_lampuuk", lik_codes: ["Wn-1"] }),
+		});
+		restore();
+		expect(mockResetQueues).toHaveBeenCalledTimes(1);
+		expect(mockResetQueues).toHaveBeenCalledWith("pantai_lampuuk", ["Wn-1"]);
+	});
+
+	test("uses the fusion finalLevel as the alert riskLevel", async () => {
+		primeTriggered("WASPADA");
+		const restore = mockTriggeredFetch();
+		const res = await app.request("/api/report", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ beach_location: "pantai_lampuuk", lik_codes: ["Wn-1"] }),
+		});
+		restore();
+		const body = await res.json();
+		expect(body.alertEvent.riskLevel).toBe("waspada");
+	});
+
+	test("does not broadcast WhatsApp when fusion result is NORMAL", async () => {
+		primeTriggered("NORMAL");
+		const restore = mockTriggeredFetch("Low Actionable");
+		await app.request("/api/report", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ beach_location: "pantai_lampuuk", lik_codes: ["Wn-1"] }),
+		});
+		restore();
+		expect(mockSendOpenClawAlert).not.toHaveBeenCalled();
+	});
+
+	test("broadcasts WhatsApp when fusion result is dangerous", async () => {
+		primeTriggered("SIAGA");
+		const restore = mockTriggeredFetch();
+		await app.request("/api/report", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ beach_location: "pantai_lampuuk", lik_codes: ["Wn-1"] }),
+		});
+		restore();
+		expect(mockSendOpenClawAlert).toHaveBeenCalledTimes(1);
 	});
 
 	test("rejects missing lik_codes", async () => {

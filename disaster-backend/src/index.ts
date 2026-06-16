@@ -7,6 +7,7 @@ import { initDb } from "./db";
 import { initWebPush, sendPushAlertToAll } from "./lib/push";
 import {
 	ALERTS_CHANNEL,
+	CORS_ALLOWED_ORIGINS,
 	ENABLE_PUSH_DELIVERY,
 	ENABLE_SSE_DELIVERY,
 	ENABLE_WS_DELIVERY,
@@ -30,7 +31,10 @@ import reportSubmitRoute from "./routes/report-submit";
 import broadcastMorningRoute from "./routes/broadcast-morning";
 
 const app = new Hono();
-app.use("/api/*", cors());
+app.use(
+	"/api/*",
+	cors({ origin: CORS_ALLOWED_ORIGINS.includes("*") ? "*" : CORS_ALLOWED_ORIGINS }),
+);
 app.onError((err, c) => {
 	console.error("[unhandled-error]", {
 		path: c.req.path,

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { redis } from "../lib/redis";
 import { sendOpenClawAlert } from "../lib/openclaw";
-import { processReport, getActiveWarning, setActiveWarning, getReportTimeRange } from "../lib/crowdsource";
+import { processReport, getActiveWarning, setActiveWarning, getReportTimeRange, resetQueues } from "../lib/crowdsource";
 import { persistReport, persistShapPrediction } from "../lib/bmkg";
 import { reassure } from "../lib/reassurance";
 import { publishIotAlertForEvent } from "../lib/iot-mqtt";
+import { checkReportRateLimit, getClientIp } from "../lib/rate-limit";
 import {
 	ALERTS_CHANNEL,
 	ALERTS_STREAM,
@@ -142,6 +143,16 @@ function sleep(ms: number) {
 }
 
 route.post("/report", async (c) => {
+	// Anonymous flood guard (no auth required): cap raw request volume per IP.
+	const clientIp = getClientIp(c.req.header("x-forwarded-for"));
+	const rate = await checkReportRateLimit(clientIp);
+	if (!rate.allowed) {
+		return c.json(
+			{ ok: false, error: "Terlalu banyak laporan. Coba lagi sebentar lagi." },
+			429,
+		);
+	}
+
 	const jwtPayload = c.get("jwtPayload") as { sub?: unknown; email?: unknown } | undefined;
 	const reporterUserId = typeof jwtPayload?.sub === "string" ? jwtPayload.sub : null;
 	const reporterEmail = typeof jwtPayload?.email === "string" ? jwtPayload.email : null;
@@ -326,17 +337,20 @@ route.post("/report", async (c) => {
 				rawResponse: result as unknown as Record<string, unknown>,
 			}, beachLocation);
 			reassuranceResult = reassured as unknown as Record<string, unknown>;
-		} catch (pgErr) {
-			console.error("[report] PostgreSQL persistence failed (non-blocking):", pgErr);
+		} catch (dbErr) {
+			console.error("[report] SQLite persistence failed (non-blocking, alert still distributed via fail-safe level):", dbErr);
 		}
 
 		const isMultisign = triggeredCodes.length > 1;
 		const isActionable = result.community_characteristics === "Actionable";
-		const shouldDistribute = true;
-
-		const riskLevel = isActionable
-			? (isMultisign ? "unsafe-high" : "unsafe")
-			: "safe";
+		// Prefer the SHAP+BMKG fusion result. If persistence/fusion failed (reassurance
+		// is null), fail safe by escalating actionable signs rather than silently
+		// downgrading to NORMAL (which would suppress the alert and the buzzer).
+		const reassuranceFinalLevel =
+			(reassuranceResult?.finalLevel as string) ??
+			(isActionable ? (isMultisign ? "SIAGA" : "WASPADA") : "NORMAL");
+		const shouldDistribute = reassuranceFinalLevel !== "NORMAL";
+		const riskLevel = reassuranceFinalLevel.toLowerCase();
 
 		const reporterCount = Object.values(codeCounts).reduce((sum, c) => sum + c, 0);
 
@@ -362,6 +376,7 @@ route.post("/report", async (c) => {
 				community_characteristics: result.community_characteristics,
 				is_multisign: isMultisign,
 				is_actionable: isActionable,
+				final_risk_level: reassuranceFinalLevel,
 				shouldDistribute,
 			},
 			input: mlPayload,
@@ -404,7 +419,7 @@ route.post("/report", async (c) => {
 			console.log("[report] published IoT MQTT alert", iotResult.topic);
 		}
 
-		if (channel !== "WHATSAPP") {
+		if (channel !== "WHATSAPP" && shouldDistribute) {
 			const alertText = formatWhatsAppAlert({
 				beachLocation,
 				communityCharacteristics: result.community_characteristics,
@@ -419,6 +434,11 @@ route.post("/report", async (c) => {
 			});
 			await sendOpenClawAlert(alertText);
 		}
+
+		// Reset the crowdsource queue for the triggered codes so a fresh batch of
+		// reports is required before the next alert (prevents an alert storm where
+		// every report past the threshold re-fires the whole pipeline for 24h).
+		await resetQueues(beachLocation, triggeredCodes);
 
 		const responsePayload: ReportResponse = {
 			ok: true,
