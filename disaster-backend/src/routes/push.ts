@@ -21,12 +21,21 @@ route.post("/push/subscribe", async (c) => {
 	if (!isPushConfigured()) {
 		return c.json({ ok: false, error: "Push not configured" }, 503);
 	}
-	if (!isValidPushSubscription(input)) {
+
+	// Frontend (api.ts) and the SW pushsubscriptionchange handler send the
+	// subscription wrapped as { subscription, beach_location }. Older/raw
+	// callers post the PushSubscription directly. Accept both shapes.
+	const candidate =
+		input && typeof input === "object" && "subscription" in input
+			? (input as { subscription: unknown }).subscription
+			: input;
+
+	if (!isValidPushSubscription(candidate)) {
 		return c.json({ ok: false, error: "Invalid PushSubscription" }, 400);
 	}
 
-	await savePushSubscription(input);
-	return c.json({ ok: true, endpoint: input.endpoint });
+	await savePushSubscription(candidate);
+	return c.json({ ok: true, endpoint: candidate.endpoint });
 });
 
 route.post("/push/unsubscribe", async (c) => {
